@@ -60,6 +60,7 @@
 
 - Root sync currently writes a run-summary line under `## Run Sync`; it does not yet mutate milestone checkboxes directly.
 - Idea refinement workflow (`TASK-8`) is still not implemented; ideas are currently basic records with title/description/status.
+- If required commands are blocked by missing permissions/sandbox limits, request permission escalation before executing them.
 
 ## Next Recommended Step
 

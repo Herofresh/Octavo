@@ -30,6 +30,7 @@ Assist in refining ideas, preparing execution plans, and implementing approved w
 - Never operate outside the approved repository and branch.
 - Never modify main directly.
 - Stay within task scope.
+- If execution is blocked by missing permissions/sandbox limits, ask for permission escalation before running the blocked command.
 
 ## Behavior
 

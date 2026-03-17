@@ -47,6 +47,7 @@ Build and maintain Octavo as a lightweight, file-first agent workspace.
 - stay within defined scope
 - when opening a new repo or branch for execution, initialize/use a run-specific backlog.md project first
 - run checks before completion
+- if required commands are blocked by missing permissions/sandbox limits, explicitly request permission escalation before proceeding
 
 ## Storage Rules
 
