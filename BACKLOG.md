@@ -40,7 +40,7 @@ Foundation
 
 - [x] idea storage format
 - [x] refinement flow
-- [ ] UI for ideas
+- [x] UI for ideas
 
 ### Execution System
 
@@ -102,6 +102,7 @@ Foundation
 - [x] removed deprecated routes and legacy compatibility fallbacks
 - [x] enforced handover content contract (context index + next-step plan)
 - [x] implemented structured idea refinement flow API and markdown section updates
+- [x] implemented ideas UI for browse/edit flows and conversation timeline
 
 ## Notes
 

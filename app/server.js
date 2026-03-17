@@ -12,6 +12,7 @@ const {
   markIdeaProjectSpawned,
   updateIdeaDocument
 } = require("./lib/ideas");
+const { createIdeasPage } = require("./lib/ideas-ui");
 const { createProjectFromIdea, getProject, listProjects } = require("./lib/projects");
 const {
   ensureRunBranch,
@@ -41,6 +42,7 @@ function createHomePage(port) {
     <ul>
       <li><a href="/health">/health</a></li>
       <li><a href="/api/backlog">/api/backlog</a></li>
+      <li><a href="/ideas">/ideas</a></li>
       <li>GET /api/ideas</li>
       <li>GET /api/ideas/:ideaId</li>
       <li>POST /api/ideas</li>
@@ -584,6 +586,11 @@ async function routeRequest(req, res) {
 
   if (pathname === "/") {
     sendHtml(res, 200, createHomePage(PORT));
+    return;
+  }
+
+  if (pathname === "/ideas") {
+    sendHtml(res, 200, createIdeasPage());
     return;
   }
 

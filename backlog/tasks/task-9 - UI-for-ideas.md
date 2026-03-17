@@ -1,9 +1,10 @@
 ---
 id: TASK-9
 title: UI for ideas
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-17 10:04'
+updated_date: '2026-03-17 13:32'
 labels: []
 dependencies: []
 ---

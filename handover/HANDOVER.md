@@ -14,6 +14,7 @@ For now, this is the single handover file to continue work across contexts.
 - Run model: execution loops inside projects; no run-local backlog initialization
 - Runtime currently includes:
   - idea APIs (create/list/read, document update, conversation append, structured refinement)
+  - ideas UI route (`/ideas`) for list/detail browsing, markdown document editing, and conversation timeline append
   - project APIs (create-from-idea, list/read, start run loop)
   - runtime provider abstraction (`mock` provider)
   - run workspace, branch/worktree, sandbox command execution, root-sync APIs
@@ -30,6 +31,7 @@ For now, this is the single handover file to continue work across contexts.
 - `ARCHITECTURE.md`: system topology and flow contracts
 - `app/server.js`: active API surface and route behavior
 - `app/lib/ideas.js`: idea planning persistence, structured refinement updates, and conversation append flow
+- `app/lib/ideas-ui.js`: ideas browse/edit UI and conversation timeline page
 - `app/lib/projects.js`: project creation from ideas and project workspace contract
 - `app/lib/runs.js`: run lifecycle, sandbox execution, backlog updates, root sync
 - `app/lib/backlog.js`: backlog.md integration and task-edit commands
@@ -37,12 +39,11 @@ For now, this is the single handover file to continue work across contexts.
 
 ## Current Plan — Next Steps
 
-1. Complete `TASK-9` (UI for ideas) for browse/edit flows on `idea.md` and conversation timeline.
-2. Implement integrations milestone incrementally:
+1. Implement integrations milestone incrementally:
    - scheduler definition workflow under `workspace/scheduler/`
    - model provider expansion beyond mock runtime
    - GitHub and Telegram adapters behind explicit approval gates
-3. Improve root sync from run summaries to milestone checkbox mutation in root `BACKLOG.md`.
+2. Improve root sync from run summaries to milestone checkbox mutation in root `BACKLOG.md`.
 
 ## Process Rules In Effect
 
