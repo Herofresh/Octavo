@@ -44,10 +44,36 @@ For now, this is the single handover file to continue work across contexts.
 
 ## Current Plan — Next Steps
 
-1. Implement integrations milestone incrementally:
+1. Rebuild the UI from scratch (do not incrementally patch current `/ideas` view):
+   - Tab 1: backlog overview.
+   - Tab 2: ideas list.
+   - Selecting an idea opens a detailed idea workspace:
+     - LLM chat about the selected idea.
+     - detailed markdown (`idea.md`) view.
+     - detailed conversation timeline view.
+   - In ideas overview, allow creating a new idea with:
+     - required title,
+     - optional summary,
+     - immediate kickoff call to LLM to initialize `idea.md` + first conversation context.
+   - Visual direction: brighter neon look and feel.
+2. Align base backlog model with process states:
+   - A ticket represents an idea and can move through all process statuses.
+   - During executing stage, the agent may create child tickets linked to a root idea ticket.
+   - Agent may create additional milestones per idea.
+   - Child tasks/tickets should be assignable to those idea-specific milestones.
+3. Implement integrations milestone incrementally:
    - scheduler definition workflow under `workspace/scheduler/`
    - GitHub and Telegram adapters behind explicit approval gates
-2. Improve root sync from run summaries to milestone checkbox mutation in root `BACKLOG.md`.
+4. Improve root sync from run summaries to milestone checkbox mutation in root `BACKLOG.md`.
+
+## User Requested Direction (Captured, Not Implemented Yet)
+
+- Rebuild UI from scratch with tabbed structure (backlog overview + ideas list).
+- Enable per-idea LLM chat in detailed view.
+- Show `idea.md` and conversation timeline in more detailed format.
+- New idea creation should immediately call LLM kickoff from title (+ optional summary) to initialize planning artifacts.
+- Base backlog should reflect process-state workflow where idea tickets can spawn child tickets/milestones during execution.
+- UI style should be brighter with neon colors.
 
 ## Process Rules In Effect
 
