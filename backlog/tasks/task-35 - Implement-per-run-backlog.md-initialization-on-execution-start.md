@@ -1,7 +1,7 @@
 ---
 id: TASK-35
 title: Implement per-run backlog.md initialization on execution start
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-17 10:13'
 labels: []

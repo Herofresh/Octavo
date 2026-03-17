@@ -3,6 +3,7 @@ const os = require("node:os");
 
 const { readBacklogTasks } = require("./lib/backlog");
 const { methodNotAllowed, notFound, sendHtml, sendJson } = require("./lib/http");
+const { openRunWorkspace } = require("./lib/runs");
 const { ensureWorkspaceFolders } = require("./lib/storage");
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
@@ -21,6 +22,7 @@ function createHomePage(port) {
     <ul>
       <li><a href="/health">/health</a></li>
       <li><a href="/api/backlog">/api/backlog</a></li>
+      <li>POST /api/runs/:runId/open</li>
     </ul>
   </body>
 </html>`;
@@ -28,19 +30,41 @@ function createHomePage(port) {
 
 async function routeRequest(req, res) {
   const method = req.method || "GET";
-  const url = req.url || "/";
+  const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const pathname = requestUrl.pathname;
+  const openRunMatch = pathname.match(/^\/api\/runs\/([A-Za-z0-9._-]+)\/open$/);
+
+  if (method === "POST" && openRunMatch) {
+    try {
+      const run = await openRunWorkspace(openRunMatch[1], {
+        projectName: requestUrl.searchParams.get("projectName") || undefined
+      });
+      sendJson(res, run.created ? 201 : 200, run);
+      return;
+    } catch (error) {
+      if (error.code === "INVALID_RUN_ID") {
+        sendJson(res, 400, {
+          error: "Bad Request",
+          message: error.message
+        });
+        return;
+      }
+
+      throw error;
+    }
+  }
 
   if (method !== "GET") {
     methodNotAllowed(res);
     return;
   }
 
-  if (url === "/") {
+  if (pathname === "/") {
     sendHtml(res, 200, createHomePage(PORT));
     return;
   }
 
-  if (url === "/health") {
+  if (pathname === "/health") {
     sendJson(res, 200, {
       service: "octavo",
       status: "ok",
@@ -49,7 +73,7 @@ async function routeRequest(req, res) {
     return;
   }
 
-  if (url === "/api/backlog") {
+  if (pathname === "/api/backlog") {
     const backlog = await readBacklogTasks();
     sendJson(res, 200, backlog);
     return;

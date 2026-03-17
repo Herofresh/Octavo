@@ -5,7 +5,8 @@ const { promisify } = require("node:util");
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
-const BACKLOG_DIR = path.join(REPO_ROOT, "backlog");
+const DEFAULT_BACKLOG_DIR_NAME = "backlog";
+const BACKLOG_DIR = path.join(REPO_ROOT, DEFAULT_BACKLOG_DIR_NAME);
 const BACKLOG_CONFIG_FILE = path.join(BACKLOG_DIR, "config.yml");
 const LOCAL_BACKLOG_BIN = path.join(REPO_ROOT, "node_modules", ".bin", "backlog");
 
@@ -61,16 +62,36 @@ function parseTaskListPlainText(output) {
   };
 }
 
-async function runBacklogCommand(args) {
+function getBacklogProjectPaths(projectRoot, backlogDirName = DEFAULT_BACKLOG_DIR_NAME) {
+  const projectDir = path.join(projectRoot, backlogDirName);
+  const configFile = path.join(projectDir, "config.yml");
+
+  return {
+    projectRoot,
+    projectDir,
+    configFile
+  };
+}
+
+async function fileExists(absolutePath) {
+  try {
+    await fs.access(absolutePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runBacklogCommandFromCwd(cwd, args) {
   try {
     return await execFileAsync(LOCAL_BACKLOG_BIN, args, {
-      cwd: REPO_ROOT,
+      cwd,
       maxBuffer: 1024 * 1024
     });
   } catch (primaryError) {
     try {
       return await execFileAsync("npx", ["--yes", "backlog", ...args], {
-        cwd: REPO_ROOT,
+        cwd,
         maxBuffer: 1024 * 1024
       });
     } catch (fallbackError) {
@@ -84,10 +105,48 @@ async function runBacklogCommand(args) {
   }
 }
 
+async function runBacklogCommand(args) {
+  return runBacklogCommandFromCwd(REPO_ROOT, args);
+}
+
+async function ensureBacklogProject(projectRoot, options = {}) {
+  const backlogDirName = options.backlogDirName || DEFAULT_BACKLOG_DIR_NAME;
+  const { projectDir, configFile } = getBacklogProjectPaths(projectRoot, backlogDirName);
+  const isInitialized = await fileExists(configFile);
+
+  if (!isInitialized) {
+    const projectName =
+      typeof options.projectName === "string" && options.projectName.trim()
+        ? options.projectName.trim()
+        : path.basename(projectRoot);
+
+    await runBacklogCommandFromCwd(projectRoot, [
+      "init",
+      "--defaults",
+      projectName,
+      "--backlog-dir",
+      backlogDirName,
+      "--config-location",
+      "folder",
+      "--check-branches",
+      "false",
+      "--include-remote",
+      "false",
+      "--auto-open-browser",
+      "false"
+    ]);
+  }
+
+  return {
+    available: true,
+    projectDir,
+    configFile,
+    initialized: !isInitialized
+  };
+}
+
 async function readBacklogTasks() {
-  try {
-    await fs.access(BACKLOG_CONFIG_FILE);
-  } catch {
+  if (!(await fileExists(BACKLOG_CONFIG_FILE))) {
     return {
       available: false,
       source: "backlog.md",
@@ -128,6 +187,8 @@ async function readBacklogTasks() {
 module.exports = {
   BACKLOG_CONFIG_FILE,
   BACKLOG_DIR,
+  ensureBacklogProject,
+  getBacklogProjectPaths,
   parseTaskListPlainText,
   readBacklogTasks
 };

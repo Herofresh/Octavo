@@ -65,7 +65,7 @@ Foundation
 - [x] implement backlog parsing
 - [ ] implement idea flow
 - [ ] define runtime interface
-- [ ] implement per-run backlog.md initialization on execution start
+- [x] implement per-run backlog.md initialization on execution start
 - [ ] link each execution run backlog to a root milestone/task
 - [ ] implement status sync from run backlog to root Backlog.md
 
