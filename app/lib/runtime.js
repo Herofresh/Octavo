@@ -1,16 +1,8 @@
 const DEFAULT_PROVIDER = process.env.OCTAVO_RUNTIME_PROVIDER || "mock";
 const DEFAULT_MODEL = process.env.OCTAVO_RUNTIME_MODEL || "mock-1";
+const { toOptionalString } = require("./normalize");
 
 const runtimeProviders = new Map();
-
-function toOptionalString(value) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : null;
-}
 
 function assertPrompt(prompt) {
   const normalized = toOptionalString(prompt);

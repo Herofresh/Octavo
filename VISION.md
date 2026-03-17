@@ -37,10 +37,10 @@ Octavo solves this by combining:
 Octavo enables a single user to:
 
 1. capture ideas quickly,
-2. refine them into structured plans,
-3. approve execution when ready,
-4. execute safely in feature branches,
-5. track progress live through a root Backlog.md plus run-specific Backlog.md projects,
+2. refine them into markdown planning artifacts with raw conversation logs,
+3. approve project spawn from an idea when ready,
+4. execute safely in feature branches through project run loops,
+5. track progress live through a root Backlog.md plus project-specific Backlog.md projects,
 6. review results before merging.
 
 ## Primary User
@@ -54,7 +54,9 @@ It is not a multi-user platform.
 - web UI control plane
 - Telegram integration
 - one general-purpose coding spell
+- file-defined agent archetypes, skills, and scheduler definitions
 - file-based storage (markdown + JSON)
+- idea folders with `idea.md` + `conversation.ndjson`
 - Backlog.md as execution contract
 - GitHub integration (repos, branches, PRs)
 - execution in isolated workspaces
@@ -93,15 +95,15 @@ User submits an idea via chat or Telegram.
 
 ### Refinement
 
-The idea is refined conversationally into a structured concept.
+The idea is refined conversationally into `idea.md`, while raw turns are appended to `conversation.ndjson`.
 
 ### Approval
 
-User selects execution target and approves the task.
+User approves spawning a project from an idea.
 
 ### Execution
 
-A spell executes within a sandbox, initializes a run-specific Backlog.md project, and updates it continuously until completion.
+A spell executes in project run loops inside a sandbox, linked to a project Backlog.md contract, and updates it continuously until completion.
 
 ### Review
 
@@ -134,6 +136,6 @@ System generates daily suggestions (no automatic execution).
 
 - ideas can be refined clearly
 - execution is safe and controlled
-- root and run backlogs both reflect real progress
+- root and project backlogs both reflect real progress
 - outputs are review-ready
 - system remains lightweight and extensible

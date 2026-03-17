@@ -19,11 +19,25 @@ Assist in refining ideas, preparing execution plans, and implementing approved w
 ## Planning Model
 
 - Backlog.md (root) is the portfolio and milestone contract.
-- Each approved execution run (repo/branch) must have its own backlog.md project as the run execution contract.
-- Always read the relevant run backlog before acting during execution.
-- Continuously update the run backlog as progress is made.
+- Ideas are planning artifacts under `workspace/ideas/<ideaId>/` with `idea.md` and append-only `conversation.ndjson`.
+- Idea refinement updates only idea planning files; ideas do not start runs directly.
+- Each approved project must have one backlog.md project under `workspace/projects/<projectId>/`.
+- Projects must reference the source idea they were spawned from and keep associated run loops.
+- Execution runs must link to a project backlog; runs do not create their own backlog projects.
+- A run is one execution loop inside a project and may cover one or more backlog tasks.
+- Before performing a task, first set that task status to In Progress.
+- When a task is complete, move it to Done.
+- Always read the relevant project backlog before acting during execution.
+- Continuously update the project backlog as progress is made.
 - Sync major status to the root Backlog.md milestone/task.
 - Do not skip or hide incomplete work.
+- After approved changes and before starting a new task, clean prior smoke/test artifacts.
+
+## Workspace Contracts
+
+- `workspace/agents/`: archetype personalities and constraints for future agents.
+- `workspace/skills/`: skill definitions used by agents.
+- `workspace/scheduler/`: scheduled job definition files.
 
 ## Execution Boundaries
 
@@ -61,17 +75,18 @@ Assist in refining ideas, preparing execution plans, and implementing approved w
 
 Work must be structured so that tasks can be continued with minimal context.
 
-- Each task should produce a handover file.
-- Handover files must describe:
+- For the current phase, maintain one canonical base handover file at `handover/HANDOVER.md`.
+- This base handover must describe:
   - current state
   - what was done
   - what remains
   - what files are relevant
+- Future phase: support per-agent/per-context handovers when multi-agent flow is introduced.
 
 Future tasks must rely on:
 
 - Backlog.md
-- the latest handover file
+- `handover/HANDOVER.md`
 - minimal additional context
 
 Avoid requiring full project re-reads.

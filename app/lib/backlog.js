@@ -2,6 +2,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
+const { toOptionalString } = require("./normalize");
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -9,6 +10,7 @@ const DEFAULT_BACKLOG_DIR_NAME = "backlog";
 const BACKLOG_DIR = path.join(REPO_ROOT, DEFAULT_BACKLOG_DIR_NAME);
 const BACKLOG_CONFIG_FILE = path.join(BACKLOG_DIR, "config.yml");
 const LOCAL_BACKLOG_BIN = path.join(REPO_ROOT, "node_modules", ".bin", "backlog");
+const LOCAL_BACKLOG_CLI = path.join(REPO_ROOT, "node_modules", "backlog.md", "cli.js");
 
 const SECTION_PATTERN = /^([A-Za-z ]+):$/;
 const TASK_PATTERN = /^\s+([A-Z]+-\d+)\s+-\s+(.+)$/;
@@ -86,29 +88,97 @@ async function fileExists(absolutePath) {
 
 async function runBacklogCommandFromCwd(cwd, args) {
   try {
-    return await execFileAsync(LOCAL_BACKLOG_BIN, args, {
+    return await execFileAsync(process.execPath, [LOCAL_BACKLOG_CLI, ...args], {
       cwd,
       maxBuffer: 1024 * 1024
     });
-  } catch (primaryError) {
+  } catch (cliError) {
     try {
-      return await execFileAsync("npx", ["--yes", "backlog", ...args], {
+      return await execFileAsync(LOCAL_BACKLOG_BIN, args, {
         cwd,
         maxBuffer: 1024 * 1024
       });
-    } catch (fallbackError) {
-      const primaryMessage = primaryError.stderr || primaryError.stdout || primaryError.message;
-      const fallbackMessage =
-        fallbackError.stderr || fallbackError.stdout || fallbackError.message;
-      throw new Error(
-        `Unable to execute backlog command.\nPrimary: ${primaryMessage}\nFallback: ${fallbackMessage}`
-      );
+    } catch (binError) {
+      try {
+        return await execFileAsync("npx", ["--yes", "backlog", ...args], {
+          cwd,
+          maxBuffer: 1024 * 1024
+        });
+      } catch (npxError) {
+        const cliMessage = cliError.stderr || cliError.stdout || cliError.message;
+        const binMessage = binError.stderr || binError.stdout || binError.message;
+        const npxMessage = npxError.stderr || npxError.stdout || npxError.message;
+        throw new Error(
+          `Unable to execute backlog command.\nCLI: ${cliMessage}\nBin: ${binMessage}\nNpx: ${npxMessage}`
+        );
+      }
     }
   }
 }
 
 async function runBacklogCommand(args) {
   return runBacklogCommandFromCwd(REPO_ROOT, args);
+}
+
+function toTaskStatus(value) {
+  const normalized = toOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (lowered === "todo" || lowered === "to-do" || lowered === "to do") {
+    return "To Do";
+  }
+
+  if (lowered === "in progress" || lowered === "in-progress" || lowered === "doing") {
+    return "In Progress";
+  }
+
+  if (lowered === "done" || lowered === "complete" || lowered === "completed") {
+    return "Done";
+  }
+
+  return normalized;
+}
+
+function validateTaskId(taskId) {
+  if (typeof taskId !== "string" || !/^[A-Z]+-\d+$/.test(taskId)) {
+    const error = new Error("Invalid taskId. Use format like TASK-10.");
+    error.code = "INVALID_TASK_ID";
+    throw error;
+  }
+
+  return taskId;
+}
+
+async function editBacklogTaskForProject(projectRoot, taskId, options = {}) {
+  const safeTaskId = validateTaskId(taskId);
+  const status = toTaskStatus(options.status);
+  const appendNotes = toOptionalString(options.appendNotes);
+  const appendFinalSummary = toOptionalString(options.appendFinalSummary);
+  const args = ["task", "edit", safeTaskId];
+
+  if (status) {
+    args.push("--status", status);
+  }
+
+  if (appendNotes) {
+    args.push("--append-notes", appendNotes);
+  }
+
+  if (appendFinalSummary) {
+    args.push("--append-final-summary", appendFinalSummary);
+  }
+
+  if (args.length === 3) {
+    const error = new Error("At least one update field is required.");
+    error.code = "INVALID_BACKLOG_UPDATE";
+    throw error;
+  }
+
+  await runBacklogCommandFromCwd(projectRoot, args);
+  return readBacklogTasksForProject(projectRoot);
 }
 
 async function ensureBacklogProject(projectRoot, options = {}) {
@@ -196,6 +266,7 @@ async function readBacklogTasks() {
 module.exports = {
   BACKLOG_CONFIG_FILE,
   BACKLOG_DIR,
+  editBacklogTaskForProject,
   ensureBacklogProject,
   getBacklogProjectPaths,
   parseTaskListPlainText,

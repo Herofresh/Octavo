@@ -3,7 +3,7 @@ const path = require("node:path");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const WORKSPACE_ROOT = path.join(REPO_ROOT, "workspace");
-const DEFAULT_WORKSPACE_FOLDERS = ["ideas", "agents", "projects", "runs", "scheduler"];
+const DEFAULT_WORKSPACE_FOLDERS = ["ideas", "agents", "skills", "projects", "runs", "scheduler"];
 
 async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
