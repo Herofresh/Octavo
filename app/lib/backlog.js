@@ -17,7 +17,7 @@ function normalizeStatus(status) {
   return status.trim().toLowerCase();
 }
 
-function parseTaskListPlainText(output) {
+function parseTaskListPlainText(output, options = {}) {
   const lines = output.split(/\r?\n/);
   const tasks = [];
   const byStatus = {};
@@ -46,12 +46,14 @@ function parseTaskListPlainText(output) {
   }
 
   const done = tasks.filter((task) => task.done).length;
+  const projectDir = options.projectDir || BACKLOG_DIR;
+  const configFile = options.configFile || BACKLOG_CONFIG_FILE;
 
   return {
     available: true,
     source: "backlog.md",
-    projectDir: BACKLOG_DIR,
-    configFile: BACKLOG_CONFIG_FILE,
+    projectDir,
+    configFile,
     summary: {
       total: tasks.length,
       done,
@@ -145,13 +147,16 @@ async function ensureBacklogProject(projectRoot, options = {}) {
   };
 }
 
-async function readBacklogTasks() {
-  if (!(await fileExists(BACKLOG_CONFIG_FILE))) {
+async function readBacklogTasksForProject(projectRoot, options = {}) {
+  const backlogDirName = options.backlogDirName || DEFAULT_BACKLOG_DIR_NAME;
+  const { projectDir, configFile } = getBacklogProjectPaths(projectRoot, backlogDirName);
+
+  if (!(await fileExists(configFile))) {
     return {
       available: false,
       source: "backlog.md",
-      projectDir: BACKLOG_DIR,
-      configFile: BACKLOG_CONFIG_FILE,
+      projectDir,
+      configFile,
       summary: {
         total: 0,
         done: 0,
@@ -163,14 +168,14 @@ async function readBacklogTasks() {
     };
   }
 
-  const { stdout } = await runBacklogCommand(["task", "list", "--plain"]);
+  const { stdout } = await runBacklogCommandFromCwd(projectRoot, ["task", "list", "--plain"]);
 
   if (stdout.includes("No tasks found.")) {
     return {
       available: true,
       source: "backlog.md",
-      projectDir: BACKLOG_DIR,
-      configFile: BACKLOG_CONFIG_FILE,
+      projectDir,
+      configFile,
       summary: {
         total: 0,
         done: 0,
@@ -181,7 +186,11 @@ async function readBacklogTasks() {
     };
   }
 
-  return parseTaskListPlainText(stdout);
+  return parseTaskListPlainText(stdout, { projectDir, configFile });
+}
+
+async function readBacklogTasks() {
+  return readBacklogTasksForProject(REPO_ROOT);
 }
 
 module.exports = {
@@ -190,5 +199,6 @@ module.exports = {
   ensureBacklogProject,
   getBacklogProjectPaths,
   parseTaskListPlainText,
-  readBacklogTasks
+  readBacklogTasks,
+  readBacklogTasksForProject
 };

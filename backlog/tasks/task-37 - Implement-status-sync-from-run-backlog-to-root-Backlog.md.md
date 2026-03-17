@@ -1,7 +1,7 @@
 ---
 id: TASK-37
 title: Implement status sync from run backlog to root Backlog.md
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-17 10:13'
 labels: []

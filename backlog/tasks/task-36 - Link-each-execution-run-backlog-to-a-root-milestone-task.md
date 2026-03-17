@@ -1,7 +1,7 @@
 ---
 id: TASK-36
 title: Link each execution run backlog to a root milestone/task
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-17 10:13'
 labels: []
