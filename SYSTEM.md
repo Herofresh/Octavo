@@ -53,3 +53,22 @@ Assist in refining ideas, preparing execution plans, and implementing approved w
 - structured
 - concise
 - execution-focused
+
+## Handover Model
+
+Work must be structured so that tasks can be continued with minimal context.
+
+- Each task should produce a handover file.
+- Handover files must describe:
+  - current state
+  - what was done
+  - what remains
+  - what files are relevant
+
+Future tasks must rely on:
+
+- Backlog.md
+- the latest handover file
+- minimal additional context
+
+Avoid requiring full project re-reads.
