@@ -1,13 +1,16 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
+const { getAgentPreset } = require("./agents");
 const { parseFrontmatterDocument, stringifyFrontmatterDocument } = require("./frontmatter");
 const { toOptionalString } = require("./normalize");
+const { getDefaultRuntimeConfig, runRuntimeCompletion } = require("./runtime");
 const { REPO_ROOT, resolveWorkspacePath } = require("./storage");
 
 const IDEA_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const IDEA_STATUSES = new Set(["new", "planning", "approved", "executing", "done", "blocked"]);
 const IDEA_REFINEMENT_STAGES = new Set(["discovery", "scope", "plan", "ready"]);
+const RUNTIME_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
 
 function toRepoRelativePath(absolutePath) {
   return path.relative(REPO_ROOT, absolutePath).split(path.sep).join("/");
@@ -37,6 +40,62 @@ function toIdeaStatus(value, fallback = "planning") {
   }
 
   return lowered;
+}
+
+function validateRuntimeId(fieldName, value) {
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+
+  const normalized = toOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (!RUNTIME_ID_PATTERN.test(normalized)) {
+    const error = new Error(
+      `Invalid ${fieldName}. Use letters, numbers, dots, underscores, slashes, colons, or hyphens.`
+    );
+    error.code = "INVALID_IDEA_RUNTIME";
+    throw error;
+  }
+
+  return normalized;
+}
+
+function readRuntimeId(value) {
+  const normalized = toOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return RUNTIME_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
+function resolveIdeaRuntime(input = {}, fallback = {}) {
+  const providerInput =
+    typeof input.runtimeProvider !== "undefined" ? input.runtimeProvider : input.provider;
+  const modelInput =
+    typeof input.runtimeModel !== "undefined" ? input.runtimeModel : input.model;
+  const defaults = getDefaultRuntimeConfig();
+  const provider = validateRuntimeId(
+    "runtimeProvider",
+    typeof providerInput === "undefined" ? fallback.provider : providerInput
+  );
+  const model = validateRuntimeId(
+    "runtimeModel",
+    typeof modelInput === "undefined" ? fallback.model : modelInput
+  );
+  const agentPreset = validateRuntimeId(
+    "agentPreset",
+    typeof input.agentPreset === "undefined" ? fallback.agentPreset : input.agentPreset
+  );
+
+  return {
+    provider: provider || defaults.provider,
+    model: model || defaults.model,
+    agentPreset: agentPreset || null
+  };
 }
 
 function slugify(input) {
@@ -284,6 +343,13 @@ async function writeIdeaMarkdown(paths, meta, body) {
 }
 
 function normalizeIdeaRecord(paths, meta, body, conversationCount) {
+  const defaults = getDefaultRuntimeConfig();
+  const runtime = {
+    provider: readRuntimeId(meta.runtimeProvider) || defaults.provider,
+    model: readRuntimeId(meta.runtimeModel) || defaults.model,
+    agentPreset: readRuntimeId(meta.agentPreset)
+  };
+
   return {
     id: meta.id || paths.ideaId,
     title: meta.title || paths.ideaId,
@@ -293,6 +359,7 @@ function normalizeIdeaRecord(paths, meta, body, conversationCount) {
       milestone: toOptionalString(meta.rootMilestone)
     },
     spawnedProjectId: toOptionalString(meta.spawnedProjectId),
+    runtime,
     refinement: {
       stage: readRefinementStage(meta.refinementStage, null)
     },
@@ -429,10 +496,14 @@ async function createIdea(input = {}) {
 
   await fs.mkdir(paths.ideaDir, { recursive: true });
   const now = new Date().toISOString();
+  const runtime = resolveIdeaRuntime(input);
   const meta = {
     id: ideaId,
     title,
     status: toIdeaStatus(input.status, "planning"),
+    runtimeProvider: runtime.provider,
+    runtimeModel: runtime.model,
+    agentPreset: runtime.agentPreset,
     refinementStage: toRefinementStage(input.refinementStage, "discovery"),
     rootTaskId: toOptionalString(input.rootTaskId),
     rootMilestone: toOptionalString(input.rootMilestone),
@@ -453,11 +524,20 @@ async function updateIdeaDocument(ideaId, input = {}) {
   const { meta, body } = await readIdeaMarkdown(paths);
   const now = new Date().toISOString();
 
+  const runtime = resolveIdeaRuntime(input, {
+    provider: meta.runtimeProvider || existing.runtime?.provider,
+    model: meta.runtimeModel || existing.runtime?.model,
+    agentPreset: meta.agentPreset || existing.runtime?.agentPreset
+  });
+
   const nextMeta = {
     ...meta,
     id: existing.id,
     title: toOptionalString(input.title) || meta.title || existing.title,
     status: toIdeaStatus(input.status, meta.status || existing.status || "planning"),
+    runtimeProvider: runtime.provider,
+    runtimeModel: runtime.model,
+    agentPreset: runtime.agentPreset,
     rootTaskId:
       typeof input.rootTaskId === "string" ? toOptionalString(input.rootTaskId) : meta.rootTaskId,
     rootMilestone:
@@ -590,6 +670,9 @@ async function applyIdeaRefinement(ideaId, input = {}) {
     id: existing.id,
     title: meta.title || existing.title,
     status,
+    runtimeProvider: meta.runtimeProvider || existing.runtime?.provider || null,
+    runtimeModel: meta.runtimeModel || existing.runtime?.model || null,
+    agentPreset: meta.agentPreset || existing.runtime?.agentPreset || null,
     refinementStage: stage,
     rootTaskId: toOptionalString(meta.rootTaskId) || existing.rootLink?.taskId || null,
     rootMilestone: toOptionalString(meta.rootMilestone) || existing.rootLink?.milestone || null,
@@ -608,6 +691,183 @@ async function applyIdeaRefinement(ideaId, input = {}) {
       appendedHighlights
     },
     entry
+  };
+}
+
+function normalizeKickoffList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => toOptionalString(item)).filter(Boolean);
+}
+
+function parseKickoffCompletion(output) {
+  const raw = typeof output === "string" ? output.trim() : "";
+  if (!raw) {
+    return {
+      summary: "_No summary generated yet._",
+      planning: "_No planning notes generated yet._",
+      decisions: [],
+      openQuestions: [],
+      nextSteps: []
+    };
+  }
+
+  const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]+?)```/i);
+  const candidate = fencedMatch ? fencedMatch[1].trim() : raw;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch {
+    parsed = null;
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    return {
+      summary: raw,
+      planning: "_No planning notes generated yet._",
+      decisions: [],
+      openQuestions: [],
+      nextSteps: []
+    };
+  }
+
+  return {
+    summary: toOptionalString(parsed.summary) || "_No summary generated yet._",
+    planning: toOptionalString(parsed.planning) || "_No planning notes generated yet._",
+    decisions: normalizeKickoffList(parsed.decisions),
+    openQuestions: normalizeKickoffList(parsed.openQuestions),
+    nextSteps: normalizeKickoffList(parsed.nextSteps)
+  };
+}
+
+async function setIdeaRuntimeProfile(ideaId, input = {}) {
+  const paths = getIdeaPaths(ideaId);
+  const existing = await requireIdea(ideaId);
+  const { meta, body } = await readIdeaMarkdown(paths);
+  const runtime = resolveIdeaRuntime(input, {
+    provider: meta.runtimeProvider || existing.runtime?.provider,
+    model: meta.runtimeModel || existing.runtime?.model,
+    agentPreset: meta.agentPreset || existing.runtime?.agentPreset
+  });
+
+  if (
+    runtime.provider === existing.runtime?.provider &&
+    runtime.model === existing.runtime?.model &&
+    runtime.agentPreset === (existing.runtime?.agentPreset || null)
+  ) {
+    return {
+      idea: existing,
+      changed: false
+    };
+  }
+
+  if (runtime.agentPreset) {
+    const preset = await getAgentPreset(runtime.agentPreset);
+    if (!preset) {
+      const error = new Error(`Unknown agent preset: ${runtime.agentPreset}`);
+      error.code = "INVALID_IDEA_RUNTIME";
+      throw error;
+    }
+  }
+
+  const now = new Date().toISOString();
+  const nextMeta = {
+    ...meta,
+    id: existing.id,
+    title: meta.title || existing.title,
+    status: toIdeaStatus(meta.status, existing.status || "planning"),
+    runtimeProvider: runtime.provider,
+    runtimeModel: runtime.model,
+    agentPreset: runtime.agentPreset,
+    refinementStage: readRefinementStage(meta.refinementStage, existing.refinement?.stage || "discovery"),
+    rootTaskId: toOptionalString(meta.rootTaskId) || existing.rootLink?.taskId || null,
+    rootMilestone: toOptionalString(meta.rootMilestone) || existing.rootLink?.milestone || null,
+    spawnedProjectId: toOptionalString(meta.spawnedProjectId) || existing.spawnedProjectId || null,
+    createdAt: meta.createdAt || existing.createdAt || now,
+    updatedAt: now
+  };
+  await writeIdeaMarkdown(paths, nextMeta, body);
+
+  return {
+    idea: await getIdea(ideaId),
+    changed: true
+  };
+}
+
+async function kickoffIdeaDocument(ideaId, input = {}) {
+  const existing = await requireIdea(ideaId);
+  const runtimeUpdate = await setIdeaRuntimeProfile(ideaId, {
+    runtimeProvider: input.runtimeProvider,
+    runtimeModel: input.runtimeModel,
+    agentPreset: input.agentPreset
+  });
+  const idea = runtimeUpdate.idea || existing;
+  const runtime = idea.runtime || getDefaultRuntimeConfig();
+  const preset = runtime.agentPreset ? await getAgentPreset(runtime.agentPreset) : null;
+  if (runtime.agentPreset && !preset) {
+    const error = new Error(`Unknown agent preset: ${runtime.agentPreset}`);
+    error.code = "INVALID_IDEA_RUNTIME";
+    throw error;
+  }
+
+  const extraContext = toOptionalString(input.context) || "";
+  const prompt = [
+    "Create an initial idea planning draft.",
+    `Idea title: ${idea.title}`,
+    "",
+    "Return JSON only with keys:",
+    "- summary (string)",
+    "- planning (string)",
+    "- decisions (array of strings)",
+    "- openQuestions (array of strings)",
+    "- nextSteps (array of strings)",
+    "",
+    "Current idea markdown:",
+    idea.markdown || "_empty_",
+    "",
+    "Extra context:",
+    extraContext || "_none_"
+  ].join("\n");
+  const systemPrompt = [toOptionalString(input.system), preset?.systemPrompt].filter(Boolean).join("\n\n");
+
+  const completion = await runRuntimeCompletion({
+    provider: runtime.provider,
+    model: runtime.model,
+    system: systemPrompt,
+    prompt,
+    metadata: {
+      type: "idea-kickoff",
+      ideaId: idea.id,
+      agentPreset: runtime.agentPreset
+    }
+  });
+  const parsed = parseKickoffCompletion(completion.output);
+  const refinement = await applyIdeaRefinement(idea.id, {
+    stage: "scope",
+    summary: parsed.summary,
+    planning: parsed.planning,
+    decisions: parsed.decisions,
+    openQuestions: parsed.openQuestions,
+    nextSteps: parsed.nextSteps,
+    highlight: `Kickoff generated via ${completion.provider}/${completion.model}`,
+    conversation: {
+      role: "assistant",
+      content: completion.output,
+      metadata: {
+        type: "kickoff",
+        provider: completion.provider,
+        model: completion.model,
+        agentPreset: runtime.agentPreset
+      }
+    }
+  });
+
+  return {
+    completion,
+    runtime,
+    refinement
   };
 }
 
@@ -673,9 +933,11 @@ module.exports = {
   createIdea,
   getIdea,
   getIdeaPaths,
+  kickoffIdeaDocument,
   listIdeas,
   markIdeaProjectSpawned,
   requireIdea,
+  setIdeaRuntimeProfile,
   updateIdeaDocument,
   validateIdeaId
 };

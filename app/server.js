@@ -1,6 +1,7 @@
 const http = require("node:http");
 const os = require("node:os");
 
+const { loadEnvFiles } = require("./lib/env");
 const { readBacklogTasks } = require("./lib/backlog");
 const { methodNotAllowed, notFound, sendHtml, sendJson } = require("./lib/http");
 const {
@@ -8,10 +9,13 @@ const {
   appendIdeaConversation,
   createIdea,
   getIdea,
+  kickoffIdeaDocument,
   listIdeas,
   markIdeaProjectSpawned,
+  setIdeaRuntimeProfile,
   updateIdeaDocument
 } = require("./lib/ideas");
+const { listAgentPresets } = require("./lib/agents");
 const { createIdeasPage } = require("./lib/ideas-ui");
 const { createProjectFromIdea, getProject, listProjects } = require("./lib/projects");
 const {
@@ -25,6 +29,8 @@ const {
 } = require("./lib/runs");
 const { getDefaultRuntimeConfig, listRuntimeProviders, runRuntimeCompletion } = require("./lib/runtime");
 const { ensureWorkspaceFolders } = require("./lib/storage");
+
+loadEnvFiles();
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
 
@@ -49,6 +55,9 @@ function createHomePage(port) {
       <li>POST /api/ideas/:ideaId/document</li>
       <li>POST /api/ideas/:ideaId/conversation</li>
       <li>POST /api/ideas/:ideaId/refinement</li>
+      <li>POST /api/ideas/:ideaId/runtime</li>
+      <li>POST /api/ideas/:ideaId/kickoff</li>
+      <li>GET /api/agents</li>
       <li>GET /api/projects</li>
       <li>GET /api/projects/:projectId</li>
       <li>POST /api/projects</li>
@@ -138,6 +147,8 @@ async function routeRequest(req, res) {
   const ideaDocumentMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/document$/);
   const ideaConversationMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/conversation$/);
   const ideaRefinementMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/refinement$/);
+  const ideaRuntimeMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/runtime$/);
+  const ideaKickoffMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/kickoff$/);
   const projectMatch = pathname.match(/^\/api\/projects\/([A-Za-z0-9._-]+)$/);
   const projectRunStartMatch = pathname.match(/^\/api\/projects\/([A-Za-z0-9._-]+)\/runs$/);
   const runMatch = pathname.match(/^\/api\/runs\/([A-Za-z0-9._-]+)$/);
@@ -161,7 +172,8 @@ async function routeRequest(req, res) {
         error.code === "INVALID_JSON_BODY" ||
         error.code === "REQUEST_BODY_TOO_LARGE" ||
         error.code === "INVALID_IDEA_ID" ||
-        error.code === "INVALID_IDEA_TITLE"
+        error.code === "INVALID_IDEA_TITLE" ||
+        error.code === "INVALID_IDEA_RUNTIME"
       ) {
         sendJson(res, 400, {
           error: "Bad Request",
@@ -192,7 +204,8 @@ async function routeRequest(req, res) {
       if (
         error.code === "INVALID_JSON_BODY" ||
         error.code === "REQUEST_BODY_TOO_LARGE" ||
-        error.code === "INVALID_IDEA_ID"
+        error.code === "INVALID_IDEA_ID" ||
+        error.code === "INVALID_IDEA_RUNTIME"
       ) {
         sendJson(res, 400, {
           error: "Bad Request",
@@ -277,6 +290,75 @@ async function routeRequest(req, res) {
     }
   }
 
+  if (method === "POST" && ideaRuntimeMatch) {
+    try {
+      const payload = await readJsonBody(req);
+      const update = await setIdeaRuntimeProfile(ideaRuntimeMatch[1], payload);
+      sendJson(res, 200, update);
+      return;
+    } catch (error) {
+      if (
+        error.code === "INVALID_JSON_BODY" ||
+        error.code === "REQUEST_BODY_TOO_LARGE" ||
+        error.code === "INVALID_IDEA_ID" ||
+        error.code === "INVALID_IDEA_RUNTIME"
+      ) {
+        sendJson(res, 400, {
+          error: "Bad Request",
+          message: error.message
+        });
+        return;
+      }
+
+      if (error.code === "IDEA_NOT_FOUND") {
+        sendJson(res, 404, {
+          error: "Not Found",
+          message: error.message
+        });
+        return;
+      }
+
+      throw error;
+    }
+  }
+
+  if (method === "POST" && ideaKickoffMatch) {
+    try {
+      const payload = await readJsonBody(req);
+      const kickoff = await kickoffIdeaDocument(ideaKickoffMatch[1], payload);
+      sendJson(res, 200, kickoff);
+      return;
+    } catch (error) {
+      if (
+        error.code === "INVALID_JSON_BODY" ||
+        error.code === "REQUEST_BODY_TOO_LARGE" ||
+        error.code === "INVALID_IDEA_ID" ||
+        error.code === "INVALID_IDEA_RUNTIME" ||
+        error.code === "INVALID_IDEA_REFINEMENT" ||
+        error.code === "INVALID_RUNTIME_PROMPT" ||
+        error.code === "RUNTIME_PROVIDER_NOT_FOUND" ||
+        error.code === "RUNTIME_PROVIDER_NOT_CONFIGURED" ||
+        error.code === "RUNTIME_COMPLETION_FAILED"
+      ) {
+        sendJson(res, 400, {
+          error: "Bad Request",
+          message: error.message
+        });
+        return;
+      }
+
+      if (error.code === "IDEA_NOT_FOUND") {
+        sendJson(res, 404, {
+          error: "Not Found",
+          message: error.message
+        });
+        return;
+      }
+
+      throw error;
+    }
+  }
+
   if (method === "POST" && pathname === "/api/projects") {
     try {
       const payload = await readJsonBody(req);
@@ -293,7 +375,11 @@ async function routeRequest(req, res) {
       const project = await createProjectFromIdea(idea, {
         id: payload.id,
         title: payload.title,
-        projectName: payload.projectName
+        projectName: payload.projectName,
+        executionHarness: payload.executionHarness,
+        runtimeProvider: payload.runtimeProvider,
+        runtimeModel: payload.runtimeModel,
+        agentPreset: payload.agentPreset
       });
       const updatedIdea = await markIdeaProjectSpawned(idea.id, {
         projectId: project.id
@@ -338,7 +424,11 @@ async function routeRequest(req, res) {
         projectName: payload.projectName,
         rootTaskId: payload.rootTaskId,
         rootMilestone: payload.rootMilestone,
-        taskIds: Array.isArray(payload.taskIds) ? payload.taskIds : []
+        taskIds: Array.isArray(payload.taskIds) ? payload.taskIds : [],
+        executionHarness: payload.executionHarness,
+        runtimeProvider: payload.runtimeProvider,
+        runtimeModel: payload.runtimeModel,
+        agentPreset: payload.agentPreset
       });
 
       let sync = null;
@@ -400,6 +490,17 @@ async function routeRequest(req, res) {
         return;
       }
 
+      if (
+        error.code === "RUNTIME_PROVIDER_NOT_CONFIGURED" ||
+        error.code === "RUNTIME_COMPLETION_FAILED"
+      ) {
+        sendJson(res, 400, {
+          error: "Bad Request",
+          message: error.message
+        });
+        return;
+      }
+
       throw error;
     }
   }
@@ -410,7 +511,11 @@ async function routeRequest(req, res) {
         projectId: toOptionalParam(requestUrl, "projectId"),
         projectName: toOptionalParam(requestUrl, "projectName"),
         rootTaskId: toOptionalParam(requestUrl, "rootTaskId"),
-        rootMilestone: toOptionalParam(requestUrl, "rootMilestone")
+        rootMilestone: toOptionalParam(requestUrl, "rootMilestone"),
+        executionHarness: toOptionalParam(requestUrl, "executionHarness"),
+        runtimeProvider: toOptionalParam(requestUrl, "runtimeProvider"),
+        runtimeModel: toOptionalParam(requestUrl, "runtimeModel"),
+        agentPreset: toOptionalParam(requestUrl, "agentPreset")
       });
       sendJson(res, run.created ? 201 : 200, run);
       return;
@@ -618,6 +723,12 @@ async function routeRequest(req, res) {
   if (pathname === "/api/projects") {
     const projects = await listProjects();
     sendJson(res, 200, projects);
+    return;
+  }
+
+  if (pathname === "/api/agents") {
+    const agents = await listAgentPresets();
+    sendJson(res, 200, agents);
     return;
   }
 

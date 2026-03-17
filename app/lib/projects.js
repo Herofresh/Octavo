@@ -4,10 +4,12 @@ const path = require("node:path");
 const { parseFrontmatterDocument, stringifyFrontmatterDocument } = require("./frontmatter");
 const { ensureBacklogProject, getBacklogProjectPaths } = require("./backlog");
 const { toOptionalString } = require("./normalize");
+const { getDefaultRuntimeConfig } = require("./runtime");
 const { REPO_ROOT, resolveWorkspacePath } = require("./storage");
 
 const PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const RUNTIME_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
 
 function toRepoRelativePath(absolutePath) {
   return path.relative(REPO_ROOT, absolutePath).split(path.sep).join("/");
@@ -35,6 +37,29 @@ function validateRunId(runId) {
   }
 
   return runId;
+}
+
+function toRuntimeId(value) {
+  const normalized = toOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (!RUNTIME_ID_PATTERN.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function resolveExecutionProfile(input = {}, fallback = {}) {
+  const defaults = getDefaultRuntimeConfig();
+  return {
+    harness: toRuntimeId(input.executionHarness) || toRuntimeId(fallback.harness) || "pi",
+    provider: toRuntimeId(input.runtimeProvider || input.provider) || toRuntimeId(fallback.provider) || defaults.provider,
+    model: toRuntimeId(input.runtimeModel || input.model) || toRuntimeId(fallback.model) || defaults.model,
+    agentPreset: toRuntimeId(input.agentPreset) || toRuntimeId(fallback.agentPreset) || null
+  };
 }
 
 function getProjectWorkspacePaths(projectId) {
@@ -133,6 +158,16 @@ async function readProjectRuns(paths, limit = null) {
 }
 
 function normalizeProjectRecord(paths, meta, body, runCount) {
+  const execution = resolveExecutionProfile(
+    {
+      executionHarness: meta.executionHarness,
+      runtimeProvider: meta.runtimeProvider,
+      runtimeModel: meta.runtimeModel,
+      agentPreset: meta.agentPreset
+    },
+    {}
+  );
+
   return {
     id: meta.id || paths.projectId,
     title: meta.title || paths.projectId,
@@ -142,6 +177,7 @@ function normalizeProjectRecord(paths, meta, body, runCount) {
     updatedAt: toOptionalString(meta.updatedAt),
     currentRunId: toOptionalString(meta.currentRunId),
     lastRunId: toOptionalString(meta.lastRunId),
+    execution,
     backlog: {
       projectDir: toRepoRelativePath(paths.backlogPaths.projectDir),
       configFile: toRepoRelativePath(paths.backlogPaths.configFile)
@@ -263,6 +299,10 @@ async function createProjectFromIdea(idea, options = {}) {
     title,
     status: "active",
     sourceIdeaId,
+    executionHarness: toRuntimeId(options.executionHarness) || "pi",
+    runtimeProvider: toRuntimeId(options.runtimeProvider) || toRuntimeId(idea.runtime?.provider) || getDefaultRuntimeConfig().provider,
+    runtimeModel: toRuntimeId(options.runtimeModel) || toRuntimeId(idea.runtime?.model) || getDefaultRuntimeConfig().model,
+    agentPreset: toRuntimeId(options.agentPreset) || toRuntimeId(idea.runtime?.agentPreset) || null,
     createdAt: now,
     updatedAt: now,
     currentRunId: null,
@@ -291,7 +331,21 @@ async function appendProjectRun(projectId, run) {
     runId: safeRunId,
     startedAt: toOptionalString(run.startedAt) || now,
     status: toOptionalString(run.status) || "running",
-    taskIds: Array.isArray(run.taskIds) ? run.taskIds : []
+    taskIds: Array.isArray(run.taskIds) ? run.taskIds : [],
+    execution: resolveExecutionProfile(
+      {
+        executionHarness: run.executionHarness,
+        runtimeProvider: run.runtimeProvider,
+        runtimeModel: run.runtimeModel,
+        agentPreset: run.agentPreset
+      },
+      {
+        harness: meta.executionHarness,
+        provider: meta.runtimeProvider,
+        model: meta.runtimeModel,
+        agentPreset: meta.agentPreset
+      }
+    )
   };
   await fs.appendFile(paths.runsFile, `${JSON.stringify(record)}\n`, "utf8");
 

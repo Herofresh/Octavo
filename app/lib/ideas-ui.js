@@ -35,7 +35,7 @@ function createIdeasPage() {
       }
 
       .shell {
-        max-width: 1400px;
+        max-width: 1480px;
         margin: 0 auto;
         padding: 20px;
       }
@@ -61,7 +61,7 @@ function createIdeasPage() {
 
       .layout {
         display: grid;
-        grid-template-columns: 340px minmax(0, 1fr);
+        grid-template-columns: 360px minmax(0, 1fr);
         gap: 14px;
       }
 
@@ -80,6 +80,18 @@ function createIdeasPage() {
 
       form {
         display: grid;
+        gap: 8px;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 8px;
       }
 
@@ -128,7 +140,7 @@ function createIdeasPage() {
         display: grid;
         gap: 6px;
         margin-top: 10px;
-        max-height: 48vh;
+        max-height: 46vh;
         overflow: auto;
       }
 
@@ -148,6 +160,12 @@ function createIdeasPage() {
         margin: 0 0 8px;
         font-size: 12px;
         color: var(--muted);
+      }
+
+      .section {
+        margin-top: 12px;
+        border-top: 1px solid #2a4f49;
+        padding-top: 12px;
       }
 
       .conversation {
@@ -188,13 +206,20 @@ function createIdeasPage() {
         color: var(--danger);
       }
 
-      @media (max-width: 980px) {
+      @media (max-width: 1050px) {
         .layout {
           grid-template-columns: 1fr;
         }
 
-        .idea-list, .timeline {
-          max-height: 220px;
+        .grid-3 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 680px) {
+        .grid-2,
+        .grid-3 {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -220,13 +245,26 @@ function createIdeasPage() {
             <label>Summary (optional)
               <textarea id="create-description" name="description"></textarea>
             </label>
+            <div class="grid-2">
+              <label>LLM Provider
+                <select id="create-provider"></select>
+              </label>
+              <label>LLM Model
+                <select id="create-model"></select>
+              </label>
+            </div>
+            <label>Agent Preset
+              <select id="create-agent"></select>
+            </label>
             <div class="actions">
               <button type="submit">Create</button>
             </div>
           </form>
 
-          <h3 style="margin-top: 14px">Ideas</h3>
-          <div class="idea-list" id="idea-list"></div>
+          <div class="section">
+            <h3>Ideas</h3>
+            <div class="idea-list" id="idea-list"></div>
+          </div>
         </aside>
 
         <section class="panel">
@@ -236,7 +274,7 @@ function createIdeasPage() {
             <label>Title
               <input id="idea-title" name="title" />
             </label>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;">
+            <div class="grid-3">
               <label>Status
                 <select id="idea-status" name="status">
                   <option value="new">new</option>
@@ -254,20 +292,49 @@ function createIdeasPage() {
                 <input id="idea-root-milestone" name="rootMilestone" placeholder="Idea System" />
               </label>
             </div>
+
+            <div class="grid-3">
+              <label>LLM Provider
+                <select id="idea-provider"></select>
+              </label>
+              <label>LLM Model
+                <select id="idea-model"></select>
+              </label>
+              <label>Agent Preset
+                <select id="idea-agent"></select>
+              </label>
+            </div>
+
             <label>idea.md (markdown)
               <textarea id="idea-markdown" name="markdown" style="min-height:260px;"></textarea>
             </label>
             <div class="actions">
               <button type="submit">Save Document</button>
+              <button class="secondary" type="button" id="migrate-runtime-btn">Migrate Runtime</button>
               <button class="secondary" type="button" id="reload-idea-btn">Reload</button>
             </div>
           </form>
 
-          <section class="conversation">
+          <section class="section">
+            <h3>LLM Kickoff</h3>
+            <form id="kickoff-form">
+              <label>Extra Context
+                <textarea id="kickoff-context"></textarea>
+              </label>
+              <label>System Prompt (optional)
+                <textarea id="kickoff-system"></textarea>
+              </label>
+              <div class="actions">
+                <button type="submit">Generate Kickoff Draft</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="conversation section">
             <h3>Conversation Timeline</h3>
             <ul class="timeline" id="idea-conversation"></ul>
             <form id="idea-conversation-form">
-              <div style="display:grid;grid-template-columns:160px 1fr;gap:8px;">
+              <div class="grid-2">
                 <label>Role
                   <select id="conversation-role" name="role">
                     <option value="user">user</option>
@@ -296,12 +363,17 @@ function createIdeasPage() {
       const createForm = document.getElementById("create-idea-form");
       const docForm = document.getElementById("idea-document-form");
       const conversationForm = document.getElementById("idea-conversation-form");
+      const kickoffForm = document.getElementById("kickoff-form");
       const reloadBtn = document.getElementById("reload-idea-btn");
+      const migrateRuntimeBtn = document.getElementById("migrate-runtime-btn");
 
       const state = {
         ideas: [],
         selectedId: null,
-        selectedIdea: null
+        selectedIdea: null,
+        runtimeProviders: [],
+        runtimeDefaults: { provider: "mock", model: "mock-1" },
+        agents: []
       };
 
       function setStatus(message, isError) {
@@ -340,7 +412,11 @@ function createIdeasPage() {
         for (const element of conversationForm.elements) {
           element.disabled = !enabled;
         }
+        for (const element of kickoffForm.elements) {
+          element.disabled = !enabled;
+        }
         reloadBtn.disabled = !enabled;
+        migrateRuntimeBtn.disabled = !enabled;
       }
 
       async function requestJson(url, options) {
@@ -351,6 +427,59 @@ function createIdeasPage() {
           throw new Error(message);
         }
         return payload;
+      }
+
+      function optionHtml(value, label, selected) {
+        const selectedAttr = selected ? " selected" : "";
+        return "<option value=\\"" + escapeHtml(value) + "\\"" + selectedAttr + ">" + escapeHtml(label) + "</option>";
+      }
+
+      function providerModels(providerId) {
+        const provider = state.runtimeProviders.find((entry) => entry.id === providerId);
+        if (!provider || !Array.isArray(provider.models)) {
+          return [];
+        }
+        return provider.models;
+      }
+
+      function fillModelSelect(selectEl, providerId, preferredValue) {
+        const models = providerModels(providerId);
+        const fallbackModel = preferredValue || state.runtimeDefaults.model || "";
+        const resolvedModels = models.length > 0 ? models : [fallbackModel];
+        const selectedModel =
+          (preferredValue && resolvedModels.includes(preferredValue) ? preferredValue : null) ||
+          resolvedModels[0] ||
+          "";
+
+        selectEl.innerHTML = resolvedModels
+          .map((model) => optionHtml(model, model, model === selectedModel))
+          .join("");
+        selectEl.value = selectedModel;
+      }
+
+      function renderRuntimeSelectors() {
+        const providerOptions = state.runtimeProviders.map((provider) => {
+          const label = provider.configured ? provider.label : provider.label + " (missing key)";
+          return { value: provider.id, label };
+        });
+        const agentOptions = [{ value: "", label: "(none)" }].concat(
+          state.agents.map((agent) => ({ value: agent.id, label: agent.title }))
+        );
+
+        const createProviderEl = document.getElementById("create-provider");
+        const ideaProviderEl = document.getElementById("idea-provider");
+        const createAgentEl = document.getElementById("create-agent");
+        const ideaAgentEl = document.getElementById("idea-agent");
+
+        const defaultProvider = state.runtimeDefaults.provider || (providerOptions[0] && providerOptions[0].value) || "mock";
+        createProviderEl.innerHTML = providerOptions.map((entry) => optionHtml(entry.value, entry.label, entry.value === defaultProvider)).join("");
+        ideaProviderEl.innerHTML = providerOptions.map((entry) => optionHtml(entry.value, entry.label, entry.value === defaultProvider)).join("");
+
+        createAgentEl.innerHTML = agentOptions.map((entry) => optionHtml(entry.value, entry.label, false)).join("");
+        ideaAgentEl.innerHTML = agentOptions.map((entry) => optionHtml(entry.value, entry.label, false)).join("");
+
+        fillModelSelect(document.getElementById("create-model"), createProviderEl.value, state.runtimeDefaults.model);
+        fillModelSelect(document.getElementById("idea-model"), ideaProviderEl.value, state.runtimeDefaults.model);
       }
 
       function renderIdeaList() {
@@ -385,6 +514,7 @@ function createIdeasPage() {
           timelineEl.innerHTML = '<li class="empty">No conversation entries.</li>';
           docForm.reset();
           conversationForm.reset();
+          kickoffForm.reset();
           setDetailEnabled(false);
           return;
         }
@@ -393,6 +523,7 @@ function createIdeasPage() {
         ideaMetaEl.textContent =
           "ideaId: " + idea.id +
           " | updated: " + formatTimestamp(idea.updatedAt) +
+          " | provider/model: " + escapeHtml(idea.runtime?.provider || "n/a") + "/" + escapeHtml(idea.runtime?.model || "n/a") +
           " | conversation: " + String(idea.conversationCount || 0);
 
         document.getElementById("idea-title").value = toInputValue(idea.title);
@@ -400,6 +531,13 @@ function createIdeasPage() {
         document.getElementById("idea-root-task").value = toInputValue(idea.rootLink && idea.rootLink.taskId);
         document.getElementById("idea-root-milestone").value = toInputValue(idea.rootLink && idea.rootLink.milestone);
         document.getElementById("idea-markdown").value = toInputValue(idea.markdown);
+
+        const providerEl = document.getElementById("idea-provider");
+        const modelEl = document.getElementById("idea-model");
+        const agentEl = document.getElementById("idea-agent");
+        providerEl.value = toInputValue(idea.runtime?.provider || state.runtimeDefaults.provider);
+        fillModelSelect(modelEl, providerEl.value, toInputValue(idea.runtime?.model || ""));
+        agentEl.value = toInputValue(idea.runtime?.agentPreset || "");
 
         const conversation = Array.isArray(idea.conversation) ? idea.conversation : [];
         timelineEl.innerHTML = "";
@@ -410,16 +548,23 @@ function createIdeasPage() {
 
         for (const entry of conversation.slice().reverse()) {
           const item = document.createElement("li");
+          const metaBits = [entry.role || "user", formatTimestamp(entry.at)];
+          if (entry.metadata && entry.metadata.type) {
+            metaBits.push(String(entry.metadata.type));
+          }
           item.innerHTML =
-            '<div class="meta">' +
-            escapeHtml(entry.role || "user") +
-            " @ " +
-            escapeHtml(formatTimestamp(entry.at)) +
-            "</div><div>" +
-            escapeHtml(entry.content || "") +
-            "</div>";
+            '<div class="meta">' + escapeHtml(metaBits.join(" @ ")) + "</div>" +
+            "<div>" + escapeHtml(entry.content || "") + "</div>";
           timelineEl.appendChild(item);
         }
+      }
+
+      async function loadRuntimeContext() {
+        const runtime = await requestJson("/api/runtime/providers");
+        state.runtimeProviders = Array.isArray(runtime.providers) ? runtime.providers : [];
+        state.runtimeDefaults = runtime.defaults || state.runtimeDefaults;
+        state.agents = await requestJson("/api/agents");
+        renderRuntimeSelectors();
       }
 
       async function loadIdeas(selectId) {
@@ -454,13 +599,24 @@ function createIdeasPage() {
         setStatus("Loaded " + idea.id, false);
       }
 
+      document.getElementById("create-provider").addEventListener("change", (event) => {
+        fillModelSelect(document.getElementById("create-model"), event.target.value, "");
+      });
+
+      document.getElementById("idea-provider").addEventListener("change", (event) => {
+        fillModelSelect(document.getElementById("idea-model"), event.target.value, "");
+      });
+
       createForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         try {
           const payload = {
             title: document.getElementById("create-title").value.trim(),
             id: document.getElementById("create-id").value.trim() || undefined,
-            description: document.getElementById("create-description").value
+            description: document.getElementById("create-description").value,
+            runtimeProvider: document.getElementById("create-provider").value,
+            runtimeModel: document.getElementById("create-model").value,
+            agentPreset: document.getElementById("create-agent").value || null
           };
           if (!payload.title) {
             throw new Error("Title is required.");
@@ -471,6 +627,7 @@ function createIdeasPage() {
             body: JSON.stringify(payload)
           });
           createForm.reset();
+          renderRuntimeSelectors();
           await loadIdeas(created.id);
           setStatus("Created " + created.id, false);
         } catch (error) {
@@ -491,6 +648,9 @@ function createIdeasPage() {
             status: document.getElementById("idea-status").value,
             rootTaskId: document.getElementById("idea-root-task").value.trim(),
             rootMilestone: document.getElementById("idea-root-milestone").value.trim(),
+            runtimeProvider: document.getElementById("idea-provider").value,
+            runtimeModel: document.getElementById("idea-model").value,
+            agentPreset: document.getElementById("idea-agent").value || null,
             markdown: document.getElementById("idea-markdown").value
           };
           await requestJson("/api/ideas/" + encodeURIComponent(state.selectedId) + "/document", {
@@ -500,6 +660,58 @@ function createIdeasPage() {
           });
           await loadIdeas(state.selectedId);
           setStatus("Saved idea.md for " + state.selectedId, false);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      migrateRuntimeBtn.addEventListener("click", async () => {
+        if (!state.selectedId) {
+          setStatus("Select an idea first.", true);
+          return;
+        }
+
+        try {
+          await requestJson("/api/ideas/" + encodeURIComponent(state.selectedId) + "/runtime", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              runtimeProvider: document.getElementById("idea-provider").value,
+              runtimeModel: document.getElementById("idea-model").value,
+              agentPreset: document.getElementById("idea-agent").value || null
+            })
+          });
+          await loadIdea(state.selectedId);
+          setStatus("Migrated idea runtime profile.", false);
+        } catch (error) {
+          setStatus(error.message, true);
+        }
+      });
+
+      kickoffForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!state.selectedId) {
+          setStatus("Select an idea first.", true);
+          return;
+        }
+
+        try {
+          const kickoff = await requestJson("/api/ideas/" + encodeURIComponent(state.selectedId) + "/kickoff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              runtimeProvider: document.getElementById("idea-provider").value,
+              runtimeModel: document.getElementById("idea-model").value,
+              agentPreset: document.getElementById("idea-agent").value || null,
+              context: document.getElementById("kickoff-context").value,
+              system: document.getElementById("kickoff-system").value
+            })
+          });
+          await loadIdea(state.selectedId);
+          setStatus(
+            "Kickoff generated via " + kickoff.completion.provider + "/" + kickoff.completion.model,
+            false
+          );
         } catch (error) {
           setStatus(error.message, true);
         }
@@ -546,9 +758,11 @@ function createIdeasPage() {
       });
 
       setDetailEnabled(false);
-      loadIdeas().catch((error) => {
-        setStatus(error.message, true);
-      });
+      loadRuntimeContext()
+        .then(() => loadIdeas())
+        .catch((error) => {
+          setStatus(error.message, true);
+        });
     </script>
   </body>
 </html>`;

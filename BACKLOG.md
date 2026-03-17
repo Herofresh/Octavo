@@ -53,7 +53,7 @@ Foundation
 
 - [ ] GitHub
 - [ ] Telegram
-- [ ] model providers
+- [x] model providers
 - [ ] scheduler
 
 ## In Progress
@@ -103,6 +103,7 @@ Foundation
 - [x] enforced handover content contract (context index + next-step plan)
 - [x] implemented structured idea refinement flow API and markdown section updates
 - [x] implemented ideas UI for browse/edit flows and conversation timeline
+- [x] implemented OpenAI/Gemini provider integration, idea kickoff generation, and runtime profile migration
 
 ## Notes
 

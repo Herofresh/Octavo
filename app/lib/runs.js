@@ -3,6 +3,7 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 
+const { getDefaultRuntimeConfig } = require("./runtime");
 const { toOptionalString } = require("./normalize");
 const {
   editBacklogTaskForProject,
@@ -22,6 +23,7 @@ const RUN_METADATA_FILE = "run.json";
 const ROOT_BACKLOG_FILE = path.join(REPO_ROOT, "BACKLOG.md");
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const TASK_ID_PATTERN = /^[A-Z]+-\d+$/;
+const RUNTIME_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
 const RUN_DIRECTORIES = {
   logs: "logs",
   artifacts: "artifacts",
@@ -62,6 +64,29 @@ function validateTaskId(taskId) {
   }
 
   return taskId;
+}
+
+function toRuntimeId(value) {
+  const normalized = toOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (!RUNTIME_ID_PATTERN.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function resolveExecutionProfile(input = {}, fallback = {}) {
+  const defaults = getDefaultRuntimeConfig();
+  return {
+    harness: toRuntimeId(input.executionHarness) || toRuntimeId(fallback.harness) || "pi",
+    provider: toRuntimeId(input.runtimeProvider) || toRuntimeId(input.provider) || toRuntimeId(fallback.provider) || defaults.provider,
+    model: toRuntimeId(input.runtimeModel) || toRuntimeId(input.model) || toRuntimeId(fallback.model) || defaults.model,
+    agentPreset: toRuntimeId(input.agentPreset) || toRuntimeId(fallback.agentPreset) || null
+  };
 }
 
 function getRunWorkspacePaths(runId) {
@@ -318,6 +343,13 @@ async function openRunWorkspace(runId, options = {}) {
     toOptionalString(options.rootTaskId) || existingMetadata?.rootLink?.taskId || null;
   const rootMilestone =
     toOptionalString(options.rootMilestone) || existingMetadata?.rootLink?.milestone || null;
+  const projectExecution = project?.execution || {};
+  const executionProfile = resolveExecutionProfile(options, {
+    harness: existingMetadata?.execution?.profile?.harness || projectExecution.harness,
+    provider: existingMetadata?.execution?.profile?.provider || projectExecution.provider,
+    model: existingMetadata?.execution?.profile?.model || projectExecution.model,
+    agentPreset: existingMetadata?.execution?.profile?.agentPreset || projectExecution.agentPreset
+  });
 
   const metadata = {
     ...existingMetadata,
@@ -352,6 +384,7 @@ async function openRunWorkspace(runId, options = {}) {
     },
     execution: {
       ...(existingMetadata?.execution || {}),
+      profile: executionProfile,
       commandCount: toOptionalNumber(existingMetadata?.execution?.commandCount) || 0
     },
     events: pushRunEvent(
@@ -389,6 +422,7 @@ async function openRunWorkspace(runId, options = {}) {
       taskId: metadata.rootLink.taskId,
       milestone: metadata.rootLink.milestone
     },
+    execution: metadata.execution?.profile || null,
     structure: metadata.structure
   };
 }
@@ -703,12 +737,20 @@ async function startProjectRun(projectId, options = {}) {
     projectId: safeProjectId,
     projectName: options.projectName,
     rootTaskId: options.rootTaskId,
-    rootMilestone: options.rootMilestone
+    rootMilestone: options.rootMilestone,
+    executionHarness: options.executionHarness,
+    runtimeProvider: options.runtimeProvider,
+    runtimeModel: options.runtimeModel,
+    agentPreset: options.agentPreset
   });
   await appendProjectRun(safeProjectId, {
     runId: run.runId,
     startedAt: new Date().toISOString(),
-    taskIds: Array.isArray(options.taskIds) ? options.taskIds : []
+    taskIds: Array.isArray(options.taskIds) ? options.taskIds : [],
+    executionHarness: run.execution?.harness,
+    runtimeProvider: run.execution?.provider,
+    runtimeModel: run.execution?.model,
+    agentPreset: run.execution?.agentPreset
   });
 
   return {
