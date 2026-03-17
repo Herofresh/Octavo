@@ -91,6 +91,14 @@ pi.dev may be used internally but must remain replaceable.
 - file-based
 - no required database
 
+## Versioning And Mirror Strategy
+
+- canonical source of truth: repo filesystem + Git history
+- auto-commit strategy is checkpoint-based (not per-keystroke autosave)
+- runtime/orchestration and workspace/backlog domains should remain separable modules
+- external knowledge bases (Obsidian/file services) are optional read-only mirrors
+- mirror conflicts are resolved in canonical repo files, then re-exported
+
 ## Workspace Structure
 
 /workspace

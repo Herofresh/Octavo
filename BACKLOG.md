@@ -26,6 +26,9 @@ Foundation
 - workspace contract includes agents, skills, and scheduler definition folders
 - handover contract (current phase): single canonical file at `handover/HANDOVER.md`
 - handover content contract: must include `Context File Index` + `Current Plan — Next Steps`
+- target split: agent/runtime orchestration code separated from workspace/backlog file-domain services
+- versioning policy: Git commit history is canonical; auto-commit only on meaningful checkpoints
+- external knowledge tools (e.g., Obsidian) are read-only mirrors, not canonical writers
 
 ## Milestones
 
@@ -73,6 +76,9 @@ Foundation
 - [x] implement project backlog initialization on execution approval/start
 - [x] link each execution run to a project backlog + root milestone/task
 - [x] implement status sync from project backlog to root Backlog.md
+- [ ] TASK-46.1 split orchestration domain from workspace/backlog domain services
+- [ ] TASK-46.2 implement checkpoint-based auto-commit orchestration with safety gates
+- [ ] TASK-46.3 add read-only knowledge-base mirror export flow
 
 ## Blocked
 

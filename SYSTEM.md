@@ -25,6 +25,9 @@ Assist in refining ideas, preparing execution plans, and implementing approved w
 - Projects must reference the source idea they were spawned from and keep associated run loops.
 - Execution runs must link to a project backlog; runs do not create their own backlog projects.
 - A run is one execution loop inside a project and may cover one or more backlog tasks.
+- Git history is canonical state history for workspace planning/execution files.
+- Auto-commit must happen on meaningful checkpoints, not on every autosave write.
+- External knowledge sync targets are mirrors only and must not overwrite canonical repo files.
 - Before performing a task, first set that task status to In Progress.
 - When a task is complete, move it to Done.
 - Always read the relevant project backlog before acting during execution.
