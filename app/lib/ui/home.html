@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Octavo Home</title>
+    <link rel="stylesheet" href="/ui/common.css" />
+    <style>
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .metric {
+        border: 1px solid rgba(121, 174, 166, 0.34);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(25, 45, 43, 0.74);
+      }
+
+      .metric .label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 24px;
+      }
+
+      .chips {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .chips li {
+        border: 1px solid rgba(121, 174, 166, 0.38);
+        border-radius: 999px;
+        padding: 5px 11px;
+        color: #c2dfd9;
+        background: rgba(121, 174, 166, 0.1);
+        font-size: 12px;
+      }
+
+      .overview-box {
+        margin-top: 12px;
+        border: 1px solid rgba(101, 153, 146, 0.36);
+        border-radius: 12px;
+        background: rgba(23, 42, 40, 0.82);
+        padding: 12px;
+      }
+
+      .overview-box h3 {
+        margin: 0 0 8px;
+        color: var(--cyan);
+        font-size: 14px;
+      }
+
+      .browser-meta {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .browser-frame {
+        margin: 0;
+        border: 1px solid rgba(101, 153, 146, 0.3);
+        border-radius: 10px;
+        background: rgba(19, 35, 34, 0.9);
+        width: 100%;
+        min-height: 520px;
+      }
+
+      @media (max-width: 860px) {
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 680px) {
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <h1>Octavo Home</h1>
+          <p class="sub">Current backlog overview with quick navigation into idea and project execution surfaces.</p>
+        </div>
+        <nav class="top-links">
+          <a class="nav-pill" data-active="true" href="/">Home</a>
+          <a class="nav-pill" href="/ideas">Ideas</a>
+          <a class="nav-pill" href="/projects">Projects</a>
+        </nav>
+      </header>
+
+      <p class="status" id="status-line">Loading backlog overview...</p>
+
+      <section class="panel">
+        <div class="section-row">
+          <h2>Current Backlog Overview</h2>
+          <button type="button" id="refresh-btn">Refresh</button>
+        </div>
+
+        <div class="metrics">
+          <article class="metric"><span class="label">Total Tasks</span><strong id="metric-total">0</strong></article>
+          <article class="metric"><span class="label">Done</span><strong id="metric-done">0</strong></article>
+          <article class="metric"><span class="label">Pending</span><strong id="metric-pending">0</strong></article>
+          <article class="metric"><span class="label">Source</span><strong id="metric-source" style="font-size:15px">backlog.md</strong></article>
+        </div>
+
+        <ul class="chips" id="status-breakdown"></ul>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:140px">Task ID</th>
+                <th>Title</th>
+                <th style="width:180px">Status</th>
+              </tr>
+            </thead>
+            <tbody id="tasks-body"></tbody>
+          </table>
+        </div>
+
+        <section class="overview-box">
+          <h3>Embedded `npx backlog browser`</h3>
+          <p id="browser-meta" class="browser-meta">Starting backlog browser...</p>
+          <iframe id="browser-frame" class="browser-frame" title="Backlog Browser"></iframe>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/ui/home.js"></script>
+  </body>
+</html>

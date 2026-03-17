@@ -518,6 +518,29 @@ async function createIdea(input = {}) {
   return getIdea(ideaId);
 }
 
+async function deleteIdea(ideaId) {
+  const paths = getIdeaPaths(ideaId);
+  try {
+    await fs.rm(paths.ideaDir, {
+      recursive: true,
+      force: false
+    });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      const notFound = new Error(`Idea not found: ${ideaId}`);
+      notFound.code = "IDEA_NOT_FOUND";
+      throw notFound;
+    }
+    throw error;
+  }
+
+  return {
+    id: paths.ideaId,
+    deleted: true,
+    deletedAt: new Date().toISOString()
+  };
+}
+
 async function updateIdeaDocument(ideaId, input = {}) {
   const paths = getIdeaPaths(ideaId);
   const existing = await requireIdea(ideaId);
@@ -871,6 +894,129 @@ async function kickoffIdeaDocument(ideaId, input = {}) {
   };
 }
 
+function toConversationPrompt(entries, limit = 24) {
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  const safeLimit =
+    typeof limit === "number" && Number.isFinite(limit) && limit > 0
+      ? Math.min(Math.floor(limit), 200)
+      : 24;
+  const selected = safeEntries.slice(-safeLimit);
+  if (selected.length === 0) {
+    return "_No conversation history yet._";
+  }
+
+  return selected
+    .map((entry, index) => {
+      const role = toOptionalString(entry?.role) || "user";
+      const content = toOptionalString(entry?.content) || "_empty_";
+      return `${index + 1}. [${role}] ${content}`;
+    })
+    .join("\n");
+}
+
+function toHistoryLimit(value, fallback = 24) {
+  if (typeof value === "undefined") {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return Math.min(parsed, 200);
+}
+
+async function chatIdea(ideaId, input = {}) {
+  const message = toOptionalString(input.message || input.content);
+  if (!message) {
+    const error = new Error("Chat message is required.");
+    error.code = "INVALID_IDEA_CHAT";
+    throw error;
+  }
+
+  const historyLimit = toHistoryLimit(input.historyLimit, 24);
+  const runtimeUpdate = await setIdeaRuntimeProfile(ideaId, {
+    runtimeProvider: input.runtimeProvider,
+    runtimeModel: input.runtimeModel,
+    agentPreset: input.agentPreset
+  });
+  const idea = runtimeUpdate.idea || (await requireIdea(ideaId));
+  const runtime = idea.runtime || getDefaultRuntimeConfig();
+  const preset = runtime.agentPreset ? await getAgentPreset(runtime.agentPreset) : null;
+  if (runtime.agentPreset && !preset) {
+    const error = new Error(`Unknown agent preset: ${runtime.agentPreset}`);
+    error.code = "INVALID_IDEA_RUNTIME";
+    throw error;
+  }
+
+  const userUpdate = await appendIdeaConversation(idea.id, {
+    role: "user",
+    content: message,
+    metadata: {
+      type: "chat-user"
+    }
+  });
+
+  const ideaWithConversation = await requireIdea(idea.id, {
+    includeConversation: true,
+    conversationLimit: historyLimit
+  });
+  const prompt = [
+    "You are helping refine and execute this idea workspace.",
+    "Respond clearly in markdown and focus on actionable planning support.",
+    "",
+    `Idea ID: ${ideaWithConversation.id}`,
+    `Title: ${ideaWithConversation.title}`,
+    `Status: ${ideaWithConversation.status}`,
+    `Root Task: ${ideaWithConversation.rootLink?.taskId || "n/a"}`,
+    `Root Milestone: ${ideaWithConversation.rootLink?.milestone || "n/a"}`,
+    "",
+    "idea.md:",
+    ideaWithConversation.markdown || "_empty_",
+    "",
+    "Recent conversation:",
+    toConversationPrompt(ideaWithConversation.conversation, historyLimit),
+    "",
+    `Latest user message: ${message}`
+  ].join("\n");
+  const systemPrompt = [preset?.systemPrompt, toOptionalString(input.system)].filter(Boolean).join("\n\n");
+  const completion = await runRuntimeCompletion({
+    provider: runtime.provider,
+    model: runtime.model,
+    system: systemPrompt,
+    prompt,
+    metadata: {
+      type: "idea-chat",
+      ideaId: ideaWithConversation.id,
+      agentPreset: runtime.agentPreset
+    }
+  });
+
+  const assistantUpdate = await appendIdeaConversation(idea.id, {
+    role: "assistant",
+    content: completion.output,
+    metadata: {
+      type: "chat-assistant",
+      provider: completion.provider,
+      model: completion.model,
+      agentPreset: runtime.agentPreset
+    }
+  });
+
+  return {
+    idea: await getIdea(idea.id, {
+      includeConversation: true
+    }),
+    runtime,
+    completion,
+    entries: {
+      user: userUpdate.entry,
+      assistant: assistantUpdate.entry
+    }
+  };
+}
+
 async function appendIdeaConversation(ideaId, input = {}) {
   const paths = getIdeaPaths(ideaId);
   const { meta, body } = await readIdeaMarkdown(paths);
@@ -930,7 +1076,9 @@ async function markIdeaProjectSpawned(ideaId, execution = {}) {
 module.exports = {
   applyIdeaRefinement,
   appendIdeaConversation,
+  chatIdea,
   createIdea,
+  deleteIdea,
   getIdea,
   getIdeaPaths,
   kickoffIdeaDocument,

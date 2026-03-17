@@ -1,13 +1,22 @@
 const http = require("node:http");
 const os = require("node:os");
+const fs = require("node:fs/promises");
+const path = require("node:path");
 
 const { loadEnvFiles } = require("./lib/env");
-const { readBacklogTasks } = require("./lib/backlog");
+const {
+  ensureBacklogBrowser,
+  getBacklogBrowserStatus,
+  readBacklogOverview,
+  readBacklogTasks
+} = require("./lib/backlog");
 const { methodNotAllowed, notFound, sendHtml, sendJson } = require("./lib/http");
 const {
   applyIdeaRefinement,
   appendIdeaConversation,
+  chatIdea,
   createIdea,
+  deleteIdea,
   getIdea,
   kickoffIdeaDocument,
   listIdeas,
@@ -16,7 +25,6 @@ const {
   updateIdeaDocument
 } = require("./lib/ideas");
 const { listAgentPresets } = require("./lib/agents");
-const { createIdeasPage } = require("./lib/ideas-ui");
 const { createProjectFromIdea, getProject, listProjects } = require("./lib/projects");
 const {
   ensureRunBranch,
@@ -33,46 +41,34 @@ const { ensureWorkspaceFolders } = require("./lib/storage");
 loadEnvFiles();
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
+const UI_ROOT = path.join(__dirname, "lib", "ui");
+const UI_CONTENT_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8"
+};
 
-function createHomePage(port) {
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Octavo Foundation</title>
-  </head>
-  <body>
-    <h1>Octavo Foundation</h1>
-    <p>Server is running on port ${port}.</p>
-    <ul>
-      <li><a href="/health">/health</a></li>
-      <li><a href="/api/backlog">/api/backlog</a></li>
-      <li><a href="/ideas">/ideas</a></li>
-      <li>GET /api/ideas</li>
-      <li>GET /api/ideas/:ideaId</li>
-      <li>POST /api/ideas</li>
-      <li>POST /api/ideas/:ideaId/document</li>
-      <li>POST /api/ideas/:ideaId/conversation</li>
-      <li>POST /api/ideas/:ideaId/refinement</li>
-      <li>POST /api/ideas/:ideaId/runtime</li>
-      <li>POST /api/ideas/:ideaId/kickoff</li>
-      <li>GET /api/agents</li>
-      <li>GET /api/projects</li>
-      <li>GET /api/projects/:projectId</li>
-      <li>POST /api/projects</li>
-      <li>POST /api/projects/:projectId/runs</li>
-      <li>GET /api/runtime/providers</li>
-      <li>POST /api/runtime/complete</li>
-      <li>POST /api/runs/:runId/open</li>
-      <li>GET /api/runs/:runId</li>
-      <li>POST /api/runs/:runId/branch</li>
-      <li>POST /api/runs/:runId/sandbox/exec</li>
-      <li>POST /api/runs/:runId/backlog/tasks/:taskId</li>
-      <li>POST /api/runs/:runId/sync-root</li>
-    </ul>
-  </body>
-</html>`;
+function resolveUiPath(relativePath) {
+  const safeRelativePath = String(relativePath || "").replace(/^\/+/, "");
+  const absolutePath = path.resolve(UI_ROOT, safeRelativePath);
+  const isInsideUiRoot = absolutePath === UI_ROOT || absolutePath.startsWith(`${UI_ROOT}${path.sep}`);
+  if (!isInsideUiRoot) {
+    const error = new Error("UI asset path escapes UI root.");
+    error.code = "INVALID_UI_ASSET";
+    throw error;
+  }
+  return absolutePath;
+}
+
+async function readUiAsset(relativePath) {
+  const absolutePath = resolveUiPath(relativePath);
+  const extension = path.extname(absolutePath).toLowerCase();
+  const contentType = UI_CONTENT_TYPES[extension] || "application/octet-stream";
+  const content = await fs.readFile(absolutePath);
+  return {
+    content,
+    contentType
+  };
 }
 
 function toOptionalParam(requestUrl, key) {
@@ -149,6 +145,7 @@ async function routeRequest(req, res) {
   const ideaRefinementMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/refinement$/);
   const ideaRuntimeMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/runtime$/);
   const ideaKickoffMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/kickoff$/);
+  const ideaChatMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/chat$/);
   const projectMatch = pathname.match(/^\/api\/projects\/([A-Za-z0-9._-]+)$/);
   const projectRunStartMatch = pathname.match(/^\/api\/projects\/([A-Za-z0-9._-]+)\/runs$/);
   const runMatch = pathname.match(/^\/api\/runs\/([A-Za-z0-9._-]+)$/);
@@ -185,6 +182,32 @@ async function routeRequest(req, res) {
       if (error.code === "IDEA_ALREADY_EXISTS") {
         sendJson(res, 409, {
           error: "Conflict",
+          message: error.message
+        });
+        return;
+      }
+
+      throw error;
+    }
+  }
+
+  if (method === "DELETE" && ideaMatch) {
+    try {
+      const deleted = await deleteIdea(ideaMatch[1]);
+      sendJson(res, 200, deleted);
+      return;
+    } catch (error) {
+      if (error.code === "INVALID_IDEA_ID") {
+        sendJson(res, 400, {
+          error: "Bad Request",
+          message: error.message
+        });
+        return;
+      }
+
+      if (error.code === "IDEA_NOT_FOUND") {
+        sendJson(res, 404, {
+          error: "Not Found",
           message: error.message
         });
         return;
@@ -335,6 +358,43 @@ async function routeRequest(req, res) {
         error.code === "INVALID_IDEA_ID" ||
         error.code === "INVALID_IDEA_RUNTIME" ||
         error.code === "INVALID_IDEA_REFINEMENT" ||
+        error.code === "INVALID_RUNTIME_PROMPT" ||
+        error.code === "RUNTIME_PROVIDER_NOT_FOUND" ||
+        error.code === "RUNTIME_PROVIDER_NOT_CONFIGURED" ||
+        error.code === "RUNTIME_COMPLETION_FAILED"
+      ) {
+        sendJson(res, 400, {
+          error: "Bad Request",
+          message: error.message
+        });
+        return;
+      }
+
+      if (error.code === "IDEA_NOT_FOUND") {
+        sendJson(res, 404, {
+          error: "Not Found",
+          message: error.message
+        });
+        return;
+      }
+
+      throw error;
+    }
+  }
+
+  if (method === "POST" && ideaChatMatch) {
+    try {
+      const payload = await readJsonBody(req);
+      const chat = await chatIdea(ideaChatMatch[1], payload);
+      sendJson(res, 200, chat);
+      return;
+    } catch (error) {
+      if (
+        error.code === "INVALID_JSON_BODY" ||
+        error.code === "REQUEST_BODY_TOO_LARGE" ||
+        error.code === "INVALID_IDEA_ID" ||
+        error.code === "INVALID_IDEA_CHAT" ||
+        error.code === "INVALID_IDEA_RUNTIME" ||
         error.code === "INVALID_RUNTIME_PROMPT" ||
         error.code === "RUNTIME_PROVIDER_NOT_FOUND" ||
         error.code === "RUNTIME_PROVIDER_NOT_CONFIGURED" ||
@@ -689,13 +749,36 @@ async function routeRequest(req, res) {
     return;
   }
 
+  if (pathname.startsWith("/ui/")) {
+    try {
+      const { content, contentType } = await readUiAsset(pathname.slice("/ui/".length));
+      res.writeHead(200, { "Content-Type": contentType });
+      res.end(content);
+      return;
+    } catch (error) {
+      if (error.code === "ENOENT" || error.code === "INVALID_UI_ASSET") {
+        notFound(res);
+        return;
+      }
+      throw error;
+    }
+  }
+
   if (pathname === "/") {
-    sendHtml(res, 200, createHomePage(PORT));
+    const home = await readUiAsset("home.html");
+    sendHtml(res, 200, home.content.toString("utf8"));
     return;
   }
 
   if (pathname === "/ideas") {
-    sendHtml(res, 200, createIdeasPage());
+    const ideas = await readUiAsset("ideas.html");
+    sendHtml(res, 200, ideas.content.toString("utf8"));
+    return;
+  }
+
+  if (pathname === "/projects") {
+    const projects = await readUiAsset("projects.html");
+    sendHtml(res, 200, projects.content.toString("utf8"));
     return;
   }
 
@@ -711,6 +794,26 @@ async function routeRequest(req, res) {
   if (pathname === "/api/backlog") {
     const backlog = await readBacklogTasks();
     sendJson(res, 200, backlog);
+    return;
+  }
+
+  if (pathname === "/api/backlog/overview") {
+    const overview = await readBacklogOverview();
+    sendJson(res, 200, overview);
+    return;
+  }
+
+  if (pathname === "/api/backlog/browser") {
+    const ensure = toBooleanParam(requestUrl, "ensure", true);
+    if (ensure) {
+      const browser = await ensureBacklogBrowser({
+        port: toOptionalParam(requestUrl, "port")
+      });
+      sendJson(res, 200, browser);
+      return;
+    }
+
+    sendJson(res, 200, getBacklogBrowserStatus());
     return;
   }
 

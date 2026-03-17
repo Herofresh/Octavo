@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Octavo Projects</title>
+    <link rel="stylesheet" href="/ui/common.css" />
+    <style>
+      .project-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 7px;
+        max-height: 44vh;
+        overflow: auto;
+      }
+
+      .project-card {
+        width: 100%;
+        text-align: left;
+        border: 1px solid rgba(101, 153, 146, 0.4);
+        border-radius: 11px;
+        padding: 9px 10px;
+        background: rgba(26, 47, 45, 0.85);
+      }
+
+      .project-card[data-active="true"] {
+        border-color: rgba(139, 207, 195, 0.68);
+        box-shadow: 0 0 0 1px rgba(139, 207, 195, 0.32);
+      }
+
+      .run-meta {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid rgba(139, 207, 195, 0.48);
+        border-radius: 999px;
+        padding: 6px 10px;
+        color: #b8ddd7;
+        background: rgba(121, 174, 166, 0.12);
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+      }
+
+      .run-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      pre.json {
+        margin: 0;
+        padding: 10px;
+        border: 1px solid rgba(101, 153, 146, 0.35);
+        border-radius: 10px;
+        max-height: 36vh;
+        overflow: auto;
+        background: rgba(23, 41, 39, 0.88);
+      }
+
+      @media (max-width: 1220px) {
+        .run-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <h1>Projects & Runs</h1>
+          <p class="sub">Project list, project details, run statuses, rerun model selection, and rollback branch controls.</p>
+        </div>
+        <nav class="top-links">
+          <a class="nav-pill" href="/">Home</a>
+          <a class="nav-pill" href="/ideas">Ideas</a>
+          <a class="nav-pill" data-active="true" href="/projects">Projects</a>
+        </nav>
+      </header>
+
+      <p class="status" id="status-line">Loading projects...</p>
+
+      <section class="layout-2">
+        <aside class="panel stack">
+          <section>
+            <div class="section-row"><h2>Create Project from Idea</h2></div>
+            <form id="create-project-form" class="stack">
+              <label>Source Idea
+                <select id="create-project-idea"></select>
+              </label>
+              <div class="grid-2">
+                <label>Project ID (optional)
+                  <input id="create-project-id" placeholder="idea-id" />
+                </label>
+                <label>Project Title (optional)
+                  <input id="create-project-title" placeholder="Project title" />
+                </label>
+              </div>
+              <div class="grid-2">
+                <label>LLM Provider
+                  <select id="create-project-provider"></select>
+                </label>
+                <label>LLM Model
+                  <select id="create-project-model"></select>
+                </label>
+              </div>
+              <label>Agent Preset
+                <select id="create-project-agent"></select>
+              </label>
+              <button type="submit" class="neon">Create Project</button>
+            </form>
+          </section>
+
+          <section>
+            <div class="section-row">
+              <h2>Projects</h2>
+              <button type="button" id="refresh-projects-btn">Refresh</button>
+            </div>
+            <ul id="project-list" class="project-list"></ul>
+          </section>
+        </aside>
+
+        <section class="panel stack">
+          <div id="project-empty" class="empty">Select a project to view details and runs.</div>
+
+          <div id="project-workspace" class="hidden stack">
+            <div class="section-row">
+              <div>
+                <h2 id="project-title">Project</h2>
+                <p class="run-meta" id="project-meta"></p>
+              </div>
+              <span class="pill" id="project-status-pill">active</span>
+            </div>
+
+            <section class="box stack">
+              <h3>Start Run / Re-run</h3>
+              <form id="start-run-form" class="stack">
+                <div class="grid-3">
+                  <label>Run ID (optional)
+                    <input id="start-run-id" placeholder="2026-03-17-project-id" />
+                  </label>
+                  <label>Root Task (optional)
+                    <input id="start-run-root-task" placeholder="TASK-44" />
+                  </label>
+                  <label>Root Milestone (optional)
+                    <input id="start-run-root-milestone" placeholder="Execution" />
+                  </label>
+                </div>
+                <div class="grid-3">
+                  <label>Harness
+                    <input id="start-run-harness" value="pi" />
+                  </label>
+                  <label>LLM Provider
+                    <select id="start-run-provider"></select>
+                  </label>
+                  <label>LLM Model
+                    <select id="start-run-model"></select>
+                  </label>
+                </div>
+                <label>Agent Preset
+                  <select id="start-run-agent"></select>
+                </label>
+                <button type="submit" class="neon">Start Run</button>
+              </form>
+            </section>
+
+            <section class="box stack">
+              <h3>Runs</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:210px">Run ID</th>
+                      <th style="width:170px">Status</th>
+                      <th>Runtime</th>
+                      <th style="width:190px">Started</th>
+                      <th style="width:110px">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="runs-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="box stack" id="run-detail-box">
+              <div class="section-row">
+                <h3>Run Details</h3>
+                <button type="button" id="refresh-run-btn">Refresh Run</button>
+              </div>
+              <p class="run-meta" id="run-meta">No run selected.</p>
+
+              <div class="run-layout">
+                <div class="stack">
+                  <form id="rollback-form" class="stack">
+                    <h4>Rollback Branch (non-destructive)</h4>
+                    <label>Base Ref
+                      <input id="rollback-base-ref" placeholder="HEAD~1" />
+                    </label>
+                    <label>Branch Name
+                      <input id="rollback-branch-name" placeholder="octavo-rollback-..." />
+                    </label>
+                    <button type="submit" class="secondary">Prepare Rollback Branch</button>
+                  </form>
+
+                  <div style="display:flex; gap:8px; flex-wrap:wrap">
+                    <button type="button" id="sync-root-btn">Sync Root Backlog</button>
+                  </div>
+                </div>
+
+                <div class="stack">
+                  <h4>Metadata</h4>
+                  <pre id="run-metadata-json" class="json mono">{}</pre>
+                  <h4>Backlog Summary</h4>
+                  <pre id="run-backlog-json" class="json mono">{}</pre>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/ui/projects.js"></script>
+  </body>
+</html>

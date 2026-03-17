@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Octavo Ideas</title>
+    <link rel="stylesheet" href="/ui/common.css" />
+    <style>
+      .ideas-shell {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+        gap: 14px;
+      }
+
+      .sidebar {
+        border: 1px solid rgba(101, 153, 146, 0.36);
+        border-radius: 16px;
+        background: rgba(25, 45, 43, 0.78);
+        padding: 12px;
+        min-height: 74vh;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .sidebar .title {
+        color: var(--cyan);
+        font-size: 15px;
+      }
+
+      .idea-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 7px;
+        overflow: auto;
+      }
+
+      .idea-card {
+        width: 100%;
+        text-align: left;
+        border: 1px solid rgba(101, 153, 146, 0.4);
+        border-radius: 11px;
+        padding: 9px 10px;
+        background: rgba(26, 47, 45, 0.85);
+      }
+
+      .idea-card[data-active="true"] {
+        border-color: rgba(139, 207, 195, 0.68);
+        box-shadow: 0 0 0 1px rgba(139, 207, 195, 0.32);
+      }
+
+      .idea-card strong {
+        display: block;
+      }
+
+      .idea-card small {
+        color: var(--muted);
+      }
+
+      .workspace {
+        border: 1px solid rgba(101, 153, 146, 0.36);
+        border-radius: 16px;
+        background: rgba(25, 45, 43, 0.78);
+        padding: 14px;
+      }
+
+      .workspace-empty {
+        border: 1px dashed rgba(101, 153, 146, 0.45);
+        border-radius: 12px;
+        padding: 22px;
+        color: var(--muted);
+      }
+
+      .workspace-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .workspace-meta {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid rgba(139, 207, 195, 0.48);
+        border-radius: 999px;
+        padding: 6px 10px;
+        color: #b8ddd7;
+        background: rgba(121, 174, 166, 0.12);
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+      }
+
+      .chat-panel {
+        margin-top: 12px;
+      }
+
+      .chat-stream {
+        border: 1px solid rgba(101, 153, 146, 0.35);
+        border-radius: 11px;
+        min-height: 320px;
+        max-height: 62vh;
+        overflow: auto;
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+        background: rgba(20, 36, 34, 0.9);
+      }
+
+      .bubble {
+        max-width: 92%;
+        padding: 9px;
+        border-radius: 10px;
+        border: 1px solid rgba(101, 153, 146, 0.45);
+        background: rgba(34, 60, 57, 0.82);
+      }
+
+      .bubble.user {
+        justify-self: end;
+        border-color: rgba(139, 207, 195, 0.58);
+        background: rgba(48, 79, 75, 0.78);
+      }
+
+      .bubble.assistant {
+        border-color: rgba(121, 174, 166, 0.55);
+        background: rgba(33, 58, 55, 0.82);
+      }
+
+      .bubble.system {
+        border-color: rgba(154, 199, 192, 0.58);
+        background: rgba(43, 69, 65, 0.8);
+      }
+
+      .bubble .meta {
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 5px;
+      }
+
+      .bubble .content {
+        white-space: pre-wrap;
+        line-height: 1.45;
+        font-size: 14px;
+      }
+
+      .send-row {
+        margin-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .send-indicator {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .send-indicator[data-state="sending"] {
+        color: #b9d9d4;
+      }
+
+      .send-indicator[data-state="sent"] {
+        color: var(--ok);
+      }
+
+      .send-indicator[data-state="error"] {
+        color: var(--danger);
+      }
+
+      .details-panel {
+        margin-top: 12px;
+        border: 1px solid rgba(101, 153, 146, 0.35);
+        border-radius: 12px;
+        padding: 10px;
+        background: rgba(22, 40, 38, 0.82);
+      }
+
+      .timeline {
+        border: 1px solid rgba(101, 153, 146, 0.35);
+        border-radius: 11px;
+        max-height: 34vh;
+        overflow: auto;
+        padding: 8px;
+        display: grid;
+        gap: 8px;
+        background: rgba(20, 36, 34, 0.9);
+      }
+
+      .timeline-item {
+        border: 1px solid rgba(101, 153, 146, 0.3);
+        border-radius: 10px;
+        padding: 8px;
+        background: rgba(23, 41, 39, 0.88);
+      }
+
+      .timeline-item .meta {
+        color: #afd3cd;
+        margin-bottom: 4px;
+        font-size: 12px;
+      }
+
+      .timeline-item pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-size: 12px;
+      }
+
+      .doc-columns {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 8px;
+      }
+
+      .md-preview {
+        border: 1px solid rgba(101, 153, 146, 0.35);
+        border-radius: 10px;
+        min-height: 230px;
+        max-height: 42vh;
+        overflow: auto;
+        padding: 10px;
+        background: rgba(20, 36, 34, 0.9);
+        line-height: 1.45;
+      }
+
+      .md-preview h1,
+      .md-preview h2,
+      .md-preview h3,
+      .md-preview h4 {
+        color: #b4ddd7;
+      }
+
+      .md-preview code {
+        border: 1px solid rgba(101, 153, 146, 0.4);
+        border-radius: 6px;
+        padding: 1px 4px;
+        background: rgba(34, 58, 55, 0.75);
+      }
+
+      .md-preview pre {
+        margin: 0 0 8px;
+        padding: 8px;
+        border: 1px solid rgba(101, 153, 146, 0.38);
+        border-radius: 8px;
+        background: rgba(26, 45, 43, 0.84);
+        overflow: auto;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 24, 23, 0.56);
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        z-index: 20;
+      }
+
+      .modal {
+        width: min(700px, 100%);
+        border: 1px solid rgba(101, 153, 146, 0.44);
+        border-radius: 14px;
+        background: rgba(28, 50, 48, 0.96);
+        padding: 14px;
+      }
+
+      .modal h3 {
+        margin: 0 0 10px;
+        color: var(--cyan);
+      }
+
+      @media (max-width: 1220px) {
+        .ideas-shell,
+        .doc-columns {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          min-height: auto;
+          grid-template-rows: auto auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <h1>Ideas Workspace</h1>
+          <p class="sub">Chat-first idea workspace. Detailed markdown/protocol view is available on demand.</p>
+        </div>
+        <nav class="top-links">
+          <a class="nav-pill" href="/">Home</a>
+          <a class="nav-pill" data-active="true" href="/ideas">Ideas</a>
+          <a class="nav-pill" href="/projects">Projects</a>
+        </nav>
+      </header>
+
+      <p class="status" id="status-line">Loading ideas...</p>
+
+      <section class="ideas-shell">
+        <aside class="sidebar">
+          <div class="section-row" style="margin-bottom:0">
+            <h2 class="title">Ideas</h2>
+            <button type="button" id="refresh-ideas-btn">Refresh</button>
+          </div>
+
+          <button type="button" id="open-create-modal-btn" class="neon">New Idea</button>
+
+          <ul class="idea-list" id="idea-list"></ul>
+        </aside>
+
+        <section class="workspace">
+          <div id="idea-empty" class="workspace-empty">No idea open. Pick one from the left or create a new one.</div>
+
+          <div id="idea-workspace" class="hidden">
+            <div class="workspace-header">
+              <div>
+                <h2 id="idea-heading">Idea</h2>
+                <p class="workspace-meta" id="idea-meta"></p>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <span class="pill" id="idea-status-pill">planning</span>
+                <button type="button" id="toggle-details-btn">Show Details</button>
+                <button type="button" id="delete-idea-btn" class="secondary">Delete Idea</button>
+              </div>
+            </div>
+
+            <section class="chat-panel box">
+              <h3>LLM Chat</h3>
+              <div id="chat-stream" class="chat-stream"></div>
+              <form id="chat-form" class="stack" style="margin-top:8px">
+                <label>Message
+                  <textarea id="chat-message" required placeholder="Type a message and press Enter to send. Shift+Enter for newline."></textarea>
+                </label>
+                <div class="send-row">
+                  <p id="chat-send-indicator" class="send-indicator" data-state="idle">Ready</p>
+                  <button type="submit" class="neon" id="chat-send-btn">Send</button>
+                </div>
+              </form>
+            </section>
+
+            <section id="idea-details-panel" class="details-panel hidden">
+              <form id="idea-document-form" class="stack">
+                <h3>Idea Document</h3>
+                <label>Title
+                  <input id="idea-title" />
+                </label>
+
+                <div class="grid-3">
+                  <label>Status
+                    <select id="idea-status">
+                      <option value="new">new</option>
+                      <option value="planning">planning</option>
+                      <option value="approved">approved</option>
+                      <option value="executing">executing</option>
+                      <option value="done">done</option>
+                      <option value="blocked">blocked</option>
+                    </select>
+                  </label>
+                  <label>Root Task
+                    <input id="idea-root-task" placeholder="TASK-44" />
+                  </label>
+                  <label>Root Milestone
+                    <input id="idea-root-milestone" placeholder="Idea System" />
+                  </label>
+                </div>
+
+                <div class="grid-3">
+                  <label>LLM Provider
+                    <select id="idea-provider"></select>
+                  </label>
+                  <label>LLM Model
+                    <select id="idea-model"></select>
+                  </label>
+                  <label>Agent Preset
+                    <select id="idea-agent"></select>
+                  </label>
+                </div>
+
+                <label>Chat System Prompt Override (optional)
+                  <textarea id="chat-system"></textarea>
+                </label>
+
+                <div style="display:flex; gap:8px; flex-wrap:wrap">
+                  <button type="submit" class="neon">Save idea.md</button>
+                  <button type="button" id="migrate-runtime-btn" class="secondary">Migrate Runtime</button>
+                  <button type="button" id="reload-idea-btn">Reload</button>
+                </div>
+              </form>
+
+              <section class="box stack" style="margin-top:10px">
+                <h3>Conversation Protocol</h3>
+                <div id="idea-timeline" class="timeline"></div>
+                <form id="kickoff-form" class="stack">
+                  <label>Kickoff Context (optional)
+                    <textarea id="kickoff-context"></textarea>
+                  </label>
+                  <label>Kickoff System Prompt (optional)
+                    <textarea id="kickoff-system"></textarea>
+                  </label>
+                  <button type="submit">Regenerate Kickoff</button>
+                </form>
+              </section>
+
+              <section class="box stack" style="margin-top:10px">
+                <h3>idea.md Detailed View</h3>
+                <div class="doc-columns">
+                  <label>Markdown
+                    <textarea id="idea-markdown" style="min-height:300px"></textarea>
+                  </label>
+                  <div>
+                    <label style="margin-bottom:4px">Rendered Preview</label>
+                    <article id="markdown-preview" class="md-preview"></article>
+                  </div>
+                </div>
+              </section>
+
+              <section class="box stack" style="margin-top:10px">
+                <h3>Spawn Project (Optional)</h3>
+                <form id="spawn-project-form" class="grid-2">
+                  <label>Project ID (optional)
+                    <input id="spawn-project-id" placeholder="idea-id" />
+                  </label>
+                  <label>Project Title (optional)
+                    <input id="spawn-project-title" placeholder="Project title" />
+                  </label>
+                  <button type="submit">Create Project from Idea</button>
+                </form>
+              </section>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="create-modal" class="modal-backdrop hidden">
+      <div class="modal">
+        <h3>Create New Idea</h3>
+        <form id="create-form" class="stack">
+          <label>Title (required)
+            <input id="create-title" required />
+          </label>
+          <label>Summary (optional)
+            <textarea id="create-summary"></textarea>
+          </label>
+
+          <div class="grid-2">
+            <label>LLM Provider
+              <select id="create-provider"></select>
+            </label>
+            <label>LLM Model
+              <select id="create-model"></select>
+            </label>
+          </div>
+          <label>Agent Preset
+            <select id="create-agent"></select>
+          </label>
+
+          <div style="display:flex; gap:8px; justify-content:flex-end">
+            <button type="button" id="close-create-modal-btn">Cancel</button>
+            <button type="submit" class="neon">Create + Kickoff</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="/ui/ideas.js"></script>
+  </body>
+</html>

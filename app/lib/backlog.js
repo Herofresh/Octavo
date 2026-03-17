@@ -1,6 +1,6 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 const { promisify } = require("node:util");
 const { toOptionalString } = require("./normalize");
 
@@ -11,9 +11,18 @@ const BACKLOG_DIR = path.join(REPO_ROOT, DEFAULT_BACKLOG_DIR_NAME);
 const BACKLOG_CONFIG_FILE = path.join(BACKLOG_DIR, "config.yml");
 const LOCAL_BACKLOG_BIN = path.join(REPO_ROOT, "node_modules", ".bin", "backlog");
 const LOCAL_BACKLOG_CLI = path.join(REPO_ROOT, "node_modules", "backlog.md", "cli.js");
+const DEFAULT_BACKLOG_BROWSER_PORT = Number.parseInt(
+  process.env.OCTAVO_BACKLOG_BROWSER_PORT || "6420",
+  10
+);
 
 const SECTION_PATTERN = /^([A-Za-z ]+):$/;
 const TASK_PATTERN = /^\s+([A-Z]+-\d+)\s+-\s+(.+)$/;
+const MAX_BROWSER_LOG_LINES = 200;
+
+let backlogBrowserProcess = null;
+let backlogBrowserSession = null;
+let backlogBrowserLogs = [];
 
 function normalizeStatus(status) {
   return status.trim().toLowerCase();
@@ -263,13 +272,133 @@ async function readBacklogTasks() {
   return readBacklogTasksForProject(REPO_ROOT);
 }
 
+function stripOverviewPreamble(output) {
+  const lines = String(output || "").split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => /^.*Project Overview/.test(line));
+  if (startIndex < 0) {
+    return lines.join("\n").trim();
+  }
+
+  return lines.slice(startIndex).join("\n").trim();
+}
+
+async function readBacklogOverview() {
+  const args = ["overview"];
+
+  const { stdout, stderr } = await runBacklogCommand(args);
+  const output = `${stdout || ""}${stderr || ""}`;
+  return {
+    source: "backlog.md",
+    generatedAt: new Date().toISOString(),
+    command: `backlog ${args.join(" ")}`,
+    output: stripOverviewPreamble(output)
+  };
+}
+
+function appendBrowserLog(line) {
+  const normalized = String(line || "").replace(/\r/g, "").split("\n").filter(Boolean);
+  if (normalized.length === 0) {
+    return;
+  }
+
+  backlogBrowserLogs = [...backlogBrowserLogs, ...normalized].slice(-MAX_BROWSER_LOG_LINES);
+}
+
+function isBacklogBrowserRunning() {
+  return Boolean(backlogBrowserProcess && backlogBrowserProcess.exitCode === null);
+}
+
+function getBacklogBrowserStatus() {
+  if (isBacklogBrowserRunning()) {
+    return {
+      running: true,
+      pid: backlogBrowserProcess.pid || null,
+      port: backlogBrowserSession?.port || null,
+      url: backlogBrowserSession?.url || null,
+      startedAt: backlogBrowserSession?.startedAt || null,
+      command: backlogBrowserSession?.command || null,
+      logs: backlogBrowserLogs
+    };
+  }
+
+  return {
+    running: false,
+    pid: null,
+    port: backlogBrowserSession?.port || null,
+    url: backlogBrowserSession?.url || null,
+    startedAt: backlogBrowserSession?.startedAt || null,
+    stoppedAt: backlogBrowserSession?.stoppedAt || null,
+    command: backlogBrowserSession?.command || null,
+    logs: backlogBrowserLogs
+  };
+}
+
+async function ensureBacklogBrowser(options = {}) {
+  const port = Number.parseInt(String(options.port || DEFAULT_BACKLOG_BROWSER_PORT), 10);
+  if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    const error = new Error("Invalid backlog browser port.");
+    error.code = "INVALID_BACKLOG_BROWSER_PORT";
+    throw error;
+  }
+
+  if (isBacklogBrowserRunning()) {
+    if (backlogBrowserSession?.port === port) {
+      return getBacklogBrowserStatus();
+    }
+
+    backlogBrowserProcess.kill("SIGTERM");
+  }
+
+  backlogBrowserLogs = [];
+  const args = [LOCAL_BACKLOG_CLI, "browser", "--no-open", "--port", String(port)];
+  const child = spawn(process.execPath, args, {
+    cwd: REPO_ROOT,
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  backlogBrowserProcess = child;
+  backlogBrowserSession = {
+    port,
+    url: `http://127.0.0.1:${port}`,
+    startedAt: new Date().toISOString(),
+    stoppedAt: null,
+    command: `${process.execPath} ${args.join(" ")}`
+  };
+
+  child.stdout.on("data", (chunk) => {
+    appendBrowserLog(chunk.toString("utf8"));
+  });
+  child.stderr.on("data", (chunk) => {
+    appendBrowserLog(chunk.toString("utf8"));
+  });
+  child.on("error", (error) => {
+    appendBrowserLog(`process error: ${error.message}`);
+  });
+  child.on("exit", (code, signal) => {
+    backlogBrowserProcess = null;
+    backlogBrowserSession = {
+      ...(backlogBrowserSession || {}),
+      stoppedAt: new Date().toISOString()
+    };
+    appendBrowserLog(`process exited (code=${code}, signal=${signal || "none"})`);
+  });
+
+  await new Promise((resolve) => {
+    setTimeout(resolve, 350);
+  });
+
+  return getBacklogBrowserStatus();
+}
+
 module.exports = {
   BACKLOG_CONFIG_FILE,
   BACKLOG_DIR,
   editBacklogTaskForProject,
+  ensureBacklogBrowser,
   ensureBacklogProject,
+  getBacklogBrowserStatus,
   getBacklogProjectPaths,
   parseTaskListPlainText,
+  readBacklogOverview,
   readBacklogTasks,
   readBacklogTasksForProject
 };
