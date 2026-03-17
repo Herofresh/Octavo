@@ -81,6 +81,8 @@ Work must be structured so that tasks can be continued with minimal context.
   - what was done
   - what remains
   - what files are relevant
+  - a `Context File Index` section with direct file references for continuation
+  - a `Current Plan — Next Steps` section tied to active backlog milestones/tasks
 - Future phase: support per-agent/per-context handovers when multi-agent flow is introduced.
 
 Future tasks must rely on:

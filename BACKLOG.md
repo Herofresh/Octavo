@@ -25,6 +25,7 @@ Foundation
 - runs are project execution loops, not idea artifacts
 - workspace contract includes agents, skills, and scheduler definition folders
 - handover contract (current phase): single canonical file at `handover/HANDOVER.md`
+- handover content contract: must include `Context File Index` + `Current Plan — Next Steps`
 
 ## Milestones
 
@@ -99,6 +100,7 @@ Foundation
 - [x] standardized base handover file in `/handover/HANDOVER.md`
 - [x] implemented idea-folder planning flow and project-run execution APIs
 - [x] removed deprecated routes and legacy compatibility fallbacks
+- [x] enforced handover content contract (context index + next-step plan)
 
 ## Notes
 

@@ -28,6 +28,9 @@ Build and maintain Octavo as a lightweight, file-first agent workspace.
 
 - root Backlog.md tracks global milestones and cross-idea progress
 - for now, use one canonical base handover file at `handover/HANDOVER.md`
+- the canonical handover must always include:
+  - a `Context File Index` with relevant source/context files
+  - a `Current Plan — Next Steps` section aligned to active backlog tasks/milestones
 - ideas are planning-only and live in `workspace/ideas/<ideaId>/` with `idea.md` + `conversation.ndjson`
 - do not start runs directly from idea editing/refinement
 - each approved project must use its own backlog.md project under workspace/projects

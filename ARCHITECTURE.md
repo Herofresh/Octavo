@@ -66,6 +66,9 @@ Backlog uses a root + project model:
 ### Handover Model (Current Phase)
 
 - single canonical base handover: `/handover/HANDOVER.md`
+- base handover content contract:
+  - include a `Context File Index` for continuation context
+  - include a `Current Plan — Next Steps` section mapped to active backlog milestones/tasks
 - future phase may extend to per-agent/per-context handovers
 
 ### Integration Layer
