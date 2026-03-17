@@ -18,9 +18,11 @@ Assist in refining ideas, preparing execution plans, and implementing approved w
 
 ## Planning Model
 
-- Backlog.md is the live execution contract.
-- Always read Backlog.md before acting during execution.
-- Continuously update Backlog.md as progress is made.
+- Backlog.md (root) is the portfolio and milestone contract.
+- Each approved execution run (repo/branch) must have its own backlog.md project as the run execution contract.
+- Always read the relevant run backlog before acting during execution.
+- Continuously update the run backlog as progress is made.
+- Sync major status to the root Backlog.md milestone/task.
 - Do not skip or hide incomplete work.
 
 ## Execution Boundaries

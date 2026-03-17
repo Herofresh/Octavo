@@ -40,7 +40,7 @@ Octavo enables a single user to:
 2. refine them into structured plans,
 3. approve execution when ready,
 4. execute safely in feature branches,
-5. track progress live through Backlog.md,
+5. track progress live through a root Backlog.md plus run-specific Backlog.md projects,
 6. review results before merging.
 
 ## Primary User
@@ -101,7 +101,7 @@ User selects execution target and approves the task.
 
 ### Execution
 
-A spell executes within a sandbox, updating Backlog.md continuously.
+A spell executes within a sandbox, initializes a run-specific Backlog.md project, and updates it continuously until completion.
 
 ### Review
 
@@ -134,6 +134,6 @@ System generates daily suggestions (no automatic execution).
 
 - ideas can be refined clearly
 - execution is safe and controlled
-- Backlog.md reflects real progress
+- root and run backlogs both reflect real progress
 - outputs are review-ready
 - system remains lightweight and extensible

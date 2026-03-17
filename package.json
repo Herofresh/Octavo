@@ -1,0 +1,15 @@
+{
+  "name": "octavo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Octavo foundation scaffold",
+  "main": "app/server.js",
+  "scripts": {
+    "start": "node app/server.js",
+    "backlog": "backlog",
+    "backlog:list": "backlog task list --plain"
+  },
+  "dependencies": {
+    "backlog.md": "^1.42.0"
+  }
+}

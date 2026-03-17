@@ -19,15 +19,17 @@ Foundation
 - approval-based execution
 - pi.dev as optional adapter
 - Backlog.md as execution contract
+- backlog.md library as backlog engine
+- dual backlog model: root milestones + per-run backlog projects
 
 ## Milestones
 
 ### Foundation
 
-- [ ] finalize file structure
-- [ ] create repo skeleton
+- [x] finalize file structure
+- [x] create repo skeleton
 - [ ] define runtime interface
-- [ ] define workspace structure
+- [x] define workspace structure
 
 ### Idea System
 
@@ -51,13 +53,21 @@ Foundation
 
 ## In Progress
 
-- [ ] defining core system files
+- [x] defining core system files
+- [x] implementing foundation scaffold (server + storage + backlog adapter)
+- [ ] defining runtime interface
 
 ## Next
 
-- [ ] scaffold repository
-- [ ] implement basic server
+- [x] scaffold repository
+- [x] implement basic server
+- [x] implement file storage helpers
+- [x] implement backlog parsing
 - [ ] implement idea flow
+- [ ] define runtime interface
+- [ ] implement per-run backlog.md initialization on execution start
+- [ ] link each execution run backlog to a root milestone/task
+- [ ] implement status sync from run backlog to root Backlog.md
 
 ## Blocked
 
@@ -75,6 +85,11 @@ Foundation
 - [x] architecture direction
 - [x] file structure design
 - [x] naming (Octavo)
+- [x] foundation scaffold (app + workspace skeleton)
+- [x] minimal Node.js server with health and backlog endpoints
+- [x] file storage helpers for markdown and JSON
+- [x] backlog.md integration (init + task migration + API adapter)
+- [x] documented dual backlog policy (root + run)
 
 ## Notes
 

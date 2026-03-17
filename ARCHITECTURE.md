@@ -8,7 +8,9 @@ It is designed to be lightweight, inspectable, and extensible.
 
 ## Core Principle
 
-Backlog.md is the live execution contract.
+Backlog uses a dual model:
+- root Backlog.md for portfolio milestones
+- per-run backlog.md projects for execution contracts
 
 ## Components
 
@@ -45,6 +47,12 @@ Backlog.md is the live execution contract.
 - backlog
 - logs
 
+### Backlog Topology
+
+- root: `/BACKLOG.md` (global roadmap + milestone tracking)
+- run: `/workspace/runs/<run-id>/backlog/` (task execution during implementation)
+- when execution targets a separate repo/branch sandbox, that workspace must include its own backlog project
+
 ### Integration Layer
 
 - GitHub
@@ -78,10 +86,12 @@ pi.dev may be used internally but must remain replaceable.
 1. refine idea
 2. approve execution
 3. create branch
-4. execute in sandbox
-5. update Backlog.md
-6. produce summary
-7. open PR
+4. initialize run backlog project
+5. execute in sandbox
+6. update run backlog continuously
+7. sync milestone state to root Backlog.md
+8. produce summary
+9. open PR
 
 ## Scheduler
 

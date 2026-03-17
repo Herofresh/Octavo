@@ -26,8 +26,10 @@ Build and maintain Octavo as a lightweight, file-first agent workspace.
 
 ## Planning Rules
 
-- Backlog.md is the execution contract
-- always update it during work
+- root Backlog.md tracks global milestones and cross-idea progress
+- each execution run must use its own backlog.md project
+- always update the active run backlog during work
+- sync important status changes back to root Backlog.md
 - reflect real progress
 - mark blockers clearly
 
@@ -43,6 +45,7 @@ Build and maintain Octavo as a lightweight, file-first agent workspace.
 - do not start without approval
 - once approved, proceed autonomously
 - stay within defined scope
+- when opening a new repo or branch for execution, initialize/use a run-specific backlog.md project first
 - run checks before completion
 
 ## Storage Rules
