@@ -19,7 +19,6 @@ For now, this is the single handover file to continue work across contexts.
   - project APIs (create-from-idea, list/read, start run loop)
   - runtime provider abstraction (`mock` provider)
   - run workspace, branch/worktree, sandbox command execution, root-sync APIs
-  - direct idea->execute endpoint is deprecated (returns conflict guidance)
 - Workspace contract includes:
   - `workspace/agents/` for archetype personalities/constraints
   - `workspace/skills/` for skill definitions
@@ -34,6 +33,4 @@ For now, this is the single handover file to continue work across contexts.
 
 ## Notes For Next Work
 
-- Add migration helper for any legacy JSON ideas/runs if needed in future imports.
-- Optionally remove deprecated `/api/ideas/:ideaId/execute` route after client migration.
 - Keep this file updated as the single base handover until multi-agent handover mode is introduced.

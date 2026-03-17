@@ -56,7 +56,6 @@ function createHomePage(port) {
       <li>POST /api/runs/:runId/branch</li>
       <li>POST /api/runs/:runId/sandbox/exec</li>
       <li>POST /api/runs/:runId/backlog/tasks/:taskId</li>
-      <li>POST /api/ideas/:ideaId/execute (deprecated)</li>
       <li>POST /api/runs/:runId/sync-root</li>
     </ul>
   </body>
@@ -143,7 +142,6 @@ async function routeRequest(req, res) {
   const backlogTaskUpdateMatch = pathname.match(
     /^\/api\/runs\/([A-Za-z0-9._-]+)\/backlog\/tasks\/([A-Z]+-\d+)$/
   );
-  const executeIdeaMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/execute$/);
   const syncRootMatch = pathname.match(/^\/api\/runs\/([A-Za-z0-9._-]+)\/sync-root$/);
   const runtimeCompletePath = pathname === "/api/runtime/complete";
 
@@ -300,7 +298,6 @@ async function routeRequest(req, res) {
       const payload = await readJsonBody(req);
       const execution = await startProjectRun(projectRunStartMatch[1], {
         runId: payload.runId,
-        ideaId: payload.ideaId,
         projectName: payload.projectName,
         rootTaskId: payload.rootTaskId,
         rootMilestone: payload.rootMilestone,
@@ -375,7 +372,6 @@ async function routeRequest(req, res) {
       const run = await openRunWorkspace(openRunMatch[1], {
         projectId: toOptionalParam(requestUrl, "projectId"),
         projectName: toOptionalParam(requestUrl, "projectName"),
-        ideaId: toOptionalParam(requestUrl, "ideaId"),
         rootTaskId: toOptionalParam(requestUrl, "rootTaskId"),
         rootMilestone: toOptionalParam(requestUrl, "rootMilestone")
       });
@@ -510,14 +506,6 @@ async function routeRequest(req, res) {
 
       throw error;
     }
-  }
-
-  if (method === "POST" && executeIdeaMatch) {
-    sendJson(res, 409, {
-      error: "Conflict",
-      message: "Idea execution is disabled. Create a project from the idea, then start a run via /api/projects/:projectId/runs."
-    });
-    return;
   }
 
   if (method === "POST" && syncRootMatch) {

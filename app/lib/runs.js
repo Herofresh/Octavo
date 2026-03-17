@@ -110,14 +110,6 @@ async function fileExists(absolutePath) {
   }
 }
 
-function resolveRepoRelativePath(absoluteOrRelativePath) {
-  if (typeof absoluteOrRelativePath !== "string" || !absoluteOrRelativePath.trim()) {
-    return null;
-  }
-
-  return path.resolve(REPO_ROOT, absoluteOrRelativePath);
-}
-
 async function runGit(args, options = {}) {
   return execFileAsync("git", args, {
     cwd: options.cwd || REPO_ROOT,
@@ -176,12 +168,6 @@ async function readRunBacklogForMetadata(paths, metadata) {
     return readBacklogTasksForProject(projectInfo.projectDir);
   }
 
-  // Backward compatibility for old run metadata that stored a run-local backlog.
-  const legacyBacklogProjectDir = resolveRepoRelativePath(metadata?.backlog?.projectDir);
-  if (legacyBacklogProjectDir) {
-    return readBacklogTasksForProject(path.dirname(legacyBacklogProjectDir));
-  }
-
   return {
     available: false,
     source: "backlog.md",
@@ -202,11 +188,6 @@ function getRunBacklogProjectRoot(paths, metadata) {
   const projectInfo = getRunProjectInfo(metadata);
   if (projectInfo) {
     return projectInfo.projectDir;
-  }
-
-  const legacyBacklogProjectDir = resolveRepoRelativePath(metadata?.backlog?.projectDir);
-  if (legacyBacklogProjectDir) {
-    return path.dirname(legacyBacklogProjectDir);
   }
 
   const error = new Error(
@@ -313,7 +294,6 @@ async function openRunWorkspace(runId, options = {}) {
   const createdAt = existingMetadata?.createdAt || now;
   const resolvedProjectId =
     toOptionalString(options.projectId) ||
-    toOptionalString(options.ideaId) ||
     toOptionalString(existingMetadata?.project?.id);
   if (!existingMetadata && !resolvedProjectId) {
     const error = new Error(
@@ -322,15 +302,18 @@ async function openRunWorkspace(runId, options = {}) {
     error.code = "RUN_PROJECT_NOT_SET";
     throw error;
   }
-  const projectSetup = resolvedProjectId
-    ? await ensureProjectWorkspace(validateProjectId(resolvedProjectId), {
-        projectName: options.projectName
+  const project = resolvedProjectId
+    ? await requireProject(validateProjectId(resolvedProjectId))
+    : null;
+  const projectSetup = project
+    ? await ensureProjectWorkspace(project.id, {
+        projectName: toOptionalString(options.projectName) || project.title
       })
     : null;
   const projectBacklogInitializedAt =
     existingMetadata?.project?.backlog?.initializedAt ||
     (projectSetup?.backlog.initializedThisCall ? now : null);
-  const ideaId = toOptionalString(options.ideaId) || existingMetadata?.idea?.id || null;
+  const ideaId = project?.sourceIdeaId || existingMetadata?.idea?.id || null;
   const rootTaskId =
     toOptionalString(options.rootTaskId) || existingMetadata?.rootLink?.taskId || null;
   const rootMilestone =
@@ -715,12 +698,10 @@ async function buildRunIdForProject(projectId) {
 async function startProjectRun(projectId, options = {}) {
   const safeProjectId = validateProjectId(projectId);
   const project = await requireProject(safeProjectId);
-  const ideaId = toOptionalString(options.ideaId) || project.sourceIdeaId || undefined;
   const resolvedRunId = toOptionalString(options.runId) || (await buildRunIdForProject(safeProjectId));
   const run = await openRunWorkspace(resolvedRunId, {
     projectId: safeProjectId,
     projectName: options.projectName,
-    ideaId,
     rootTaskId: options.rootTaskId,
     rootMilestone: options.rootMilestone
   });

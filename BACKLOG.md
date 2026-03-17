@@ -98,6 +98,7 @@ Foundation
 - [x] documented idea/project/run model and workspace folder contracts
 - [x] standardized base handover file in `/handover/HANDOVER.md`
 - [x] implemented idea-folder planning flow and project-run execution APIs
+- [x] removed deprecated routes and legacy compatibility fallbacks
 
 ## Notes
 
