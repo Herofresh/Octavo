@@ -39,7 +39,7 @@ Foundation
 ### Idea System
 
 - [x] idea storage format
-- [ ] refinement flow
+- [x] refinement flow
 - [ ] UI for ideas
 
 ### Execution System
@@ -101,6 +101,7 @@ Foundation
 - [x] implemented idea-folder planning flow and project-run execution APIs
 - [x] removed deprecated routes and legacy compatibility fallbacks
 - [x] enforced handover content contract (context index + next-step plan)
+- [x] implemented structured idea refinement flow API and markdown section updates
 
 ## Notes
 

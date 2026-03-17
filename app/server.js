@@ -4,6 +4,7 @@ const os = require("node:os");
 const { readBacklogTasks } = require("./lib/backlog");
 const { methodNotAllowed, notFound, sendHtml, sendJson } = require("./lib/http");
 const {
+  applyIdeaRefinement,
   appendIdeaConversation,
   createIdea,
   getIdea,
@@ -45,6 +46,7 @@ function createHomePage(port) {
       <li>POST /api/ideas</li>
       <li>POST /api/ideas/:ideaId/document</li>
       <li>POST /api/ideas/:ideaId/conversation</li>
+      <li>POST /api/ideas/:ideaId/refinement</li>
       <li>GET /api/projects</li>
       <li>GET /api/projects/:projectId</li>
       <li>POST /api/projects</li>
@@ -133,6 +135,7 @@ async function routeRequest(req, res) {
   const ideaMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)$/);
   const ideaDocumentMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/document$/);
   const ideaConversationMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/conversation$/);
+  const ideaRefinementMatch = pathname.match(/^\/api\/ideas\/([A-Za-z0-9._-]+)\/refinement$/);
   const projectMatch = pathname.match(/^\/api\/projects\/([A-Za-z0-9._-]+)$/);
   const projectRunStartMatch = pathname.match(/^\/api\/projects\/([A-Za-z0-9._-]+)\/runs$/);
   const runMatch = pathname.match(/^\/api\/runs\/([A-Za-z0-9._-]+)$/);
@@ -220,6 +223,38 @@ async function routeRequest(req, res) {
         error.code === "REQUEST_BODY_TOO_LARGE" ||
         error.code === "INVALID_IDEA_ID" ||
         error.code === "INVALID_IDEA_CONVERSATION"
+      ) {
+        sendJson(res, 400, {
+          error: "Bad Request",
+          message: error.message
+        });
+        return;
+      }
+
+      if (error.code === "IDEA_NOT_FOUND") {
+        sendJson(res, 404, {
+          error: "Not Found",
+          message: error.message
+        });
+        return;
+      }
+
+      throw error;
+    }
+  }
+
+  if (method === "POST" && ideaRefinementMatch) {
+    try {
+      const payload = await readJsonBody(req);
+      const refinement = await applyIdeaRefinement(ideaRefinementMatch[1], payload);
+      sendJson(res, 200, refinement);
+      return;
+    } catch (error) {
+      if (
+        error.code === "INVALID_JSON_BODY" ||
+        error.code === "REQUEST_BODY_TOO_LARGE" ||
+        error.code === "INVALID_IDEA_ID" ||
+        error.code === "INVALID_IDEA_REFINEMENT"
       ) {
         sendJson(res, 400, {
           error: "Bad Request",
