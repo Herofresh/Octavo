@@ -1,7 +1,7 @@
 ---
 id: TASK-5
 title: define runtime interface
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-17 10:04'
 labels: []

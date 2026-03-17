@@ -28,7 +28,7 @@ Foundation
 
 - [x] finalize file structure
 - [x] create repo skeleton
-- [ ] define runtime interface
+- [x] define runtime interface
 - [x] define workspace structure
 
 ### Idea System
@@ -55,7 +55,7 @@ Foundation
 
 - [x] defining core system files
 - [x] implementing foundation scaffold (server + storage + backlog adapter)
-- [ ] defining runtime interface
+- [x] defining runtime interface
 
 ## Next
 
@@ -63,8 +63,8 @@ Foundation
 - [x] implement basic server
 - [x] implement file storage helpers
 - [x] implement backlog parsing
-- [ ] implement idea flow
-- [ ] define runtime interface
+- [x] implement idea flow
+- [x] define runtime interface
 - [x] implement per-run backlog.md initialization on execution start
 - [x] link each execution run backlog to a root milestone/task
 - [x] implement status sync from run backlog to root Backlog.md

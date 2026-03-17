@@ -1,7 +1,7 @@
 ---
 id: TASK-25
 title: implement idea flow
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-17 10:04'
 labels: []
